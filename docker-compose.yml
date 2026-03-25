@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: ./trading-chats-backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.runtime
     container_name: trading-chats-backend
     restart: unless-stopped
     environment:
@@ -20,7 +20,7 @@ services:
   frontend:
     build:
       context: ./trading-chats-frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.runtime
     container_name: trading-chats-frontend
     restart: unless-stopped
     depends_on:

@@ -7,4 +7,5 @@ vendor
 coverage
 .vscode
 .idea
+api.exe
 Dockerfile
