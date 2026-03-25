@@ -8,3 +8,5 @@ coverage/
 .env.*
 trading-chats-backend/.env
 trading-chats-frontend/.env
+!docker-package/frontend/dist/
+!docker-package/frontend/dist/**
