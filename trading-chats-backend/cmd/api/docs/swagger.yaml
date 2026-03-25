@@ -1,0 +1,9 @@
+basePath: /api
+host: localhost:8080
+info:
+  contact: {}
+  description: 凌期AI辅助期货挑选品种和持仓止盈止损分析程序API文档
+  title: 凌期AI辅助期货挑选品种和持仓止盈止损分析程序
+  version: "1.0"
+paths: {}
+swagger: "2.0"

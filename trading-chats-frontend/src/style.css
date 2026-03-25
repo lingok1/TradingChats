@@ -1,0 +1,15 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+}
+
+#app {
+  height: 100%;
+}
