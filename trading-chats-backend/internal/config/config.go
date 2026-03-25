@@ -8,11 +8,11 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	MongoDB  MongoDBConfig
-	Redis    RedisConfig
-	JWT      JWTConfig
-	API      APIConfig
+	Server  ServerConfig
+	MongoDB MongoDBConfig
+	Redis   RedisConfig
+	JWT     JWTConfig
+	API     APIConfig
 }
 
 type ServerConfig struct {
@@ -39,7 +39,6 @@ type APIConfig struct {
 }
 
 func Load() (*Config, error) {
-	// Load .env file if it exists
 	_ = godotenv.Load()
 
 	jwtExpiration, err := time.ParseDuration(getEnv("JWT_EXPIRATION", "24h"))
@@ -58,11 +57,11 @@ func Load() (*Config, error) {
 			Env:  getEnv("ENV", "development"),
 		},
 		MongoDB: MongoDBConfig{
-			URI:      getEnv("MONGODB_URI", "mongodb://admin:mongo123@122.51.4.80:27017"),
+			URI:      getEnv("MONGODB_URI", "mongodb://admin:mongo123@150.158.18.92:27017"),
 			Database: getEnv("MONGODB_DATABASE", "trading_chats"),
 		},
 		Redis: RedisConfig{
-			URI: getEnv("REDIS_URI", "redis://:redis123@122.51.4.80:6379/0"),
+			URI: getEnv("REDIS_URI", "redis://:redis123@150.158.18.92:6379/0"),
 		},
 		JWT: JWTConfig{
 			Secret:     getEnv("JWT_SECRET", "your_jwt_secret_key"),

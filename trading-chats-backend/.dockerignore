@@ -1,0 +1,10 @@
+.git
+node_modules
+bin
+vendor
+.env
+*.log
+coverage
+.vscode
+.idea
+Dockerfile

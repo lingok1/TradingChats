@@ -6,5 +6,6 @@ coverage/
 *.log
 .env
 .env.*
+*.exe
 trading-chats-backend/.env
 trading-chats-frontend/.env
