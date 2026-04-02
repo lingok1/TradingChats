@@ -87,6 +87,16 @@ definitions:
     - tenant_name
     - username
     type: object
+  models.ResetPasswordRequest:
+    properties:
+      new_password:
+        type: string
+      username:
+        type: string
+    required:
+    - new_password
+    - username
+    type: object
   models.Response:
     properties:
       code:
@@ -362,6 +372,32 @@ paths:
           schema:
             $ref: '#/definitions/models.Response'
       summary: 用户注册
+      tags:
+      - 鉴权
+  /api/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: 使用用户名直接重置密码，并使该用户全部会话失效
+      parameters:
+      - description: 重置密码请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 重置密码
       tags:
       - 鉴权
   /api/model-api-configs:

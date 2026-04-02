@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Refresh, Setting, Moon, Sunny, HomeFilled, DataAnalysis, Goods, Position, Notification } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import type { AIResponse } from './api/types'
 import { getSystemConfig } from './api/systemConfig'
 import { getLatestAIResponses } from './api/aiResponses'
@@ -9,9 +10,11 @@ import { useIsMobile } from './composables/useIsMobile'
 import { useTheme } from './composables/useTheme'
 import { asTimeString } from './utils/time'
 import type { SignalRow } from './utils/markdownTable'
+import { hasRenderableMarkdownTable } from './utils/markdownTable'
 import ModelPanel from './components/ModelPanel.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
 import SignalDetailDrawer from './components/SignalDetailDrawer.vue'
+import LoginDialog from './components/LoginDialog.vue'
 
 const { isMobile } = useIsMobile()
 const { mode } = useTheme()
@@ -19,6 +22,12 @@ const { mode } = useTheme()
 const activeTab = ref('home')
 const startX = ref(0)
 const endX = ref(0)
+const loginOpen = ref(false)
+const accessToken = ref('')
+const refreshToken = ref('')
+const currentUsername = ref('')
+
+const authStorageKey = 'tc_auth'
 
 const tabMeta: Record<string, { title: string; description: string }> = {
   home: {
@@ -45,6 +54,43 @@ const tabMeta: Record<string, { title: string; description: string }> = {
 
 const currentTabMeta = computed(() => tabMeta[activeTab.value] ?? tabMeta.home)
 const isHomeTab = computed(() => activeTab.value === 'home')
+const isLoggedIn = computed(() => accessToken.value.length > 0)
+
+function persistAuth() {
+  localStorage.setItem(
+    authStorageKey,
+    JSON.stringify({
+      accessToken: accessToken.value,
+      refreshToken: refreshToken.value,
+      username: currentUsername.value,
+    }),
+  )
+}
+
+function loadAuth() {
+  const raw = localStorage.getItem(authStorageKey)
+  if (!raw) return
+
+  try {
+    const parsed = JSON.parse(raw) as { accessToken?: string; refreshToken?: string; username?: string }
+    accessToken.value = parsed.accessToken ?? ''
+    refreshToken.value = parsed.refreshToken ?? ''
+    currentUsername.value = parsed.username ?? ''
+    if (!currentUsername.value && accessToken.value) {
+      currentUsername.value = '已登录用户'
+    }
+  } catch {
+    localStorage.removeItem(authStorageKey)
+  }
+}
+
+function clearAuth() {
+  accessToken.value = ''
+  refreshToken.value = ''
+  currentUsername.value = ''
+  localStorage.removeItem(authStorageKey)
+  localStorage.removeItem('tc_access_token')
+}
 
 function handleTabChange(tab: any) {
   activeTab.value = tab.props.name as string
@@ -104,17 +150,19 @@ const batchCreatedAt = computed(() => {
 const completedResponses = computed(() => responses.value.filter((r) => r.status === 'completed'))
 
 const modelGroups = computed<ModelGroup[]>(() => {
-  return completedResponses.value.map((r) => ({
-    key: `${r.provider}:${r.model_name}:${r.id ?? ''}`,
-    modelName: r.model_name,
-    provider: r.provider,
-    status: r.status,
-    error: r.error,
-    markdown: r.response || '',
-  }))
+  return completedResponses.value
+    .filter((r) => hasRenderableMarkdownTable(r.response || ''))
+    .map((r) => ({
+      key: `${r.provider}:${r.model_name}:${r.id ?? ''}`,
+      modelName: r.model_name,
+      provider: r.provider,
+      status: r.status,
+      error: r.error,
+      markdown: r.response || '',
+    }))
 })
 
-const successCount = computed(() => completedResponses.value.length)
+const successCount = computed(() => modelGroups.value.length)
 const totalCount = computed(() => responses.value.length)
 
 async function loadLatest() {
@@ -158,7 +206,34 @@ async function loadSystemConfig() {
   }
 }
 
+function handleSettingsClick() {
+  if (!isLoggedIn.value) {
+    loginOpen.value = true
+    return
+  }
+  settingsOpen.value = true
+}
+
+function handleLoginSuccess(payload: { accessToken: string; refreshToken: string; username: string }) {
+  accessToken.value = payload.accessToken
+  refreshToken.value = payload.refreshToken
+  currentUsername.value = payload.username
+  localStorage.setItem('tc_access_token', payload.accessToken)
+  persistAuth()
+  settingsOpen.value = true
+}
+
+function handleLogout() {
+  clearAuth()
+  settingsOpen.value = false
+  ElMessage.success('已退出登录')
+}
+
 onMounted(() => {
+  loadAuth()
+  if (accessToken.value) {
+    localStorage.setItem('tc_access_token', accessToken.value)
+  }
   loadSystemConfig()
   loadLatest()
 })
@@ -225,7 +300,7 @@ onMounted(() => {
           <el-icon v-if="mode !== 'dark'"><Moon /></el-icon>
           <el-icon v-else><Sunny /></el-icon>
         </el-button>
-        <el-button circle @click="settingsOpen = true" title="设置">
+        <el-button circle @click="handleSettingsClick" title="设置">
           <el-icon><Setting /></el-icon>
         </el-button>
       </div>
@@ -238,7 +313,9 @@ onMounted(() => {
             <div class="tc-batch">批次：{{ currentBatchId || '-' }}</div>
             <div class="tc-time">时间：{{ batchCreatedAt || '-' }}</div>
           </div>
-          <el-tag type="success">成功 {{ successCount }}/{{ totalCount }}</el-tag>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <el-tag type="success">成功 {{ successCount }}/{{ totalCount }}</el-tag>
+          </div>
         </div>
 
         <el-alert
@@ -278,7 +355,14 @@ onMounted(() => {
       </div>
     </el-main>
 
-    <SettingsDrawer v-model="settingsOpen" :mobile="isMobile" />
+    <SettingsDrawer
+      v-if="isLoggedIn"
+      v-model="settingsOpen"
+      :mobile="isMobile"
+      :username="currentUsername"
+      @logout="handleLogout"
+    />
+
     <SignalDetailDrawer
       v-model="detailOpen"
       :row="detailRow"
@@ -286,6 +370,8 @@ onMounted(() => {
       :model-name="detailModelName"
       :mobile="isMobile"
     />
+
+    <LoginDialog v-model="loginOpen" @success="handleLoginSuccess" />
   </el-container>
 </template>
 
@@ -299,26 +385,29 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 16px;
   border-bottom: 1px solid var(--el-border-color-light);
+  background: var(--el-bg-color);
+  padding: 0 16px;
+  flex-wrap: nowrap;
 }
 
-.tc-header-left {
+.tc-header-left,
+.tc-header-right {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 .tc-logo {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
 }
 
 .tc-title {
+  font-size: 18px;
   font-weight: 700;
-  white-space: nowrap;
 }
 
 .tc-header-tabs {
@@ -326,14 +415,8 @@ onMounted(() => {
   min-width: 0;
 }
 
-.tc-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .tc-main {
-  padding: 16px;
+  background: var(--el-bg-color-page);
 }
 
 .tc-toolbar {
@@ -341,17 +424,24 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
-.tc-batch,
+.tc-batch {
+  font-weight: 600;
+}
+
 .tc-time {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
+  margin-top: 4px;
 }
 
 .tc-empty {
-  padding: 48px 0;
+  background: var(--el-bg-color);
+  border-radius: 12px;
+  padding: 24px;
 }
 
 .tc-list {
@@ -360,29 +450,75 @@ onMounted(() => {
   gap: 16px;
 }
 
-.tc-placeholder-wrap {
-  min-height: calc(100vh - 180px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.ogo-tabs :deep(.el-tabs__header) {
+  margin-bottom: 0;
+  border-bottom: none;
 }
 
-.ogo-tabs :deep(.el-tabs__header) {
-  margin: 0;
+.ogo-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.ogo-tabs :deep(.el-tabs__item) {
+  padding: 0;
+  margin-right: 16px;
 }
 
 .ogo-tabs-tab-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
 }
 
 .ogo-tabs-icon {
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .ogo-tabs-text {
-  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ogo-tabs :deep(.el-tabs__item.is-active .ogo-tabs-tab-btn) {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+
+.ogo-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
+.tc-placeholder-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 120px);
+}
+
+@media (max-width: 768px) {
+  .tc-header {
+    padding: 0 12px;
+    min-height: 56px;
+  }
+
+  .tc-title {
+    font-size: 16px;
+  }
+
+  .tc-logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  .tc-main {
+    padding: 12px;
+  }
 }
 </style>

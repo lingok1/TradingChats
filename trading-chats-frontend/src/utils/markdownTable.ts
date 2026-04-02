@@ -3,7 +3,17 @@ export type MarkdownTable = {
   rows: string[][]
 }
 
+const MARKDOWN_TABLE_HEADER_RE = /(^|\n)\|\s*序号\s*\|/
+const MARKDOWN_TABLE_DATA_ROW_RE = /(^|\n)\|\s*\d+\s*\|/
+
+export function hasRenderableMarkdownTable(markdown: string): boolean {
+  const normalized = normalizeMarkdown(markdown)
+  return MARKDOWN_TABLE_HEADER_RE.test(normalized) && MARKDOWN_TABLE_DATA_ROW_RE.test(normalized)
+}
+
 export function parseMarkdownTable(markdown: string): MarkdownTable | null {
+  if (!hasRenderableMarkdownTable(markdown)) return null
+
   const normalized = normalizeMarkdown(markdown)
   const lines = normalized
     .split('\n')
@@ -24,7 +34,7 @@ export function parseMarkdownTable(markdown: string): MarkdownTable | null {
 }
 
 function normalizeMarkdown(markdown: string): string {
-  return markdown.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n')
+  return markdown.replace(/\r\n/g, '\n').replace(/\n/g, '\n').replace(/\r\n/g, '\n')
 }
 
 function splitRow(line: string): string[] {

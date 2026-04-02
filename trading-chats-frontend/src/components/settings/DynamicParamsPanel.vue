@@ -144,9 +144,6 @@ onMounted(() => {
             :pager-count="5"
             prev-text="上一页"
             next-text="下一页"
-            :page-sizes-text="'条/页'"
-            :total-text="'共 ' + paramList.length + ' 条'"
-            :goto-text="'前往'"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
           />

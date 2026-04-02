@@ -15,26 +15,26 @@ const (
 )
 
 type Tenant struct {
-	ID          string      `bson:"_id,omitempty" json:"id"`
-	Name        string      `bson:"name" json:"name"`
-	Code        string      `bson:"code" json:"code"`
-	Type        TenantType  `bson:"type" json:"type"`
-	Status      string      `bson:"status" json:"status"`
-	CreatedAt   interface{} `bson:"created_at" json:"created_at"`
-	UpdatedAt   interface{} `bson:"updated_at" json:"updated_at"`
+	ID        string      `bson:"_id,omitempty" json:"id"`
+	Name      string      `bson:"name" json:"name"`
+	Code      string      `bson:"code" json:"code"`
+	Type      TenantType  `bson:"type" json:"type"`
+	Status    string      `bson:"status" json:"status"`
+	CreatedAt interface{} `bson:"created_at" json:"created_at"`
+	UpdatedAt interface{} `bson:"updated_at" json:"updated_at"`
 }
 
 type User struct {
-	ID             string      `bson:"_id,omitempty" json:"id"`
-	TenantID       string      `bson:"tenant_id" json:"tenant_id"`
-	Username       string      `bson:"username" json:"username"`
-	PasswordHash   string      `bson:"password_hash" json:"-"`
-	DisplayName    string      `bson:"display_name" json:"display_name"`
-	Role           Role        `bson:"role" json:"role"`
-	Status         string      `bson:"status" json:"status"`
-	LastLoginAt    interface{} `bson:"last_login_at,omitempty" json:"last_login_at,omitempty"`
-	CreatedAt      interface{} `bson:"created_at" json:"created_at"`
-	UpdatedAt      interface{} `bson:"updated_at" json:"updated_at"`
+	ID           string      `bson:"_id,omitempty" json:"id"`
+	TenantID     string      `bson:"tenant_id" json:"tenant_id"`
+	Username     string      `bson:"username" json:"username"`
+	PasswordHash string      `bson:"password_hash" json:"-"`
+	DisplayName  string      `bson:"display_name" json:"display_name"`
+	Role         Role        `bson:"role" json:"role"`
+	Status       string      `bson:"status" json:"status"`
+	LastLoginAt  interface{} `bson:"last_login_at,omitempty" json:"last_login_at,omitempty"`
+	CreatedAt    interface{} `bson:"created_at" json:"created_at"`
+	UpdatedAt    interface{} `bson:"updated_at" json:"updated_at"`
 }
 
 type UserSession struct {
@@ -55,11 +55,16 @@ type LoginRequest struct {
 }
 
 type RegisterRequest struct {
-	TenantName   string `json:"tenant_name" binding:"required"`
-	TenantCode   string `json:"tenant_code" binding:"required"`
-	Username     string `json:"username" binding:"required"`
-	Password     string `json:"password" binding:"required"`
-	DisplayName  string `json:"display_name" binding:"required"`
+	TenantName  string `json:"tenant_name" binding:"required"`
+	TenantCode  string `json:"tenant_code" binding:"required"`
+	Username    string `json:"username" binding:"required"`
+	Password    string `json:"password" binding:"required"`
+	DisplayName string `json:"display_name" binding:"required"`
+}
+
+type ResetPasswordRequest struct {
+	Username    string `json:"username" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
 }
 
 type LoginResponse struct {

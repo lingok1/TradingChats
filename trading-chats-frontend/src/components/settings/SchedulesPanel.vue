@@ -14,18 +14,15 @@ const loading = ref(false)
 const toggleLoadingMap = reactive<Record<string, boolean>>({})
 const list = ref<ScheduleConfig[]>([])
 
-// 分页相关
 const currentPage = ref(1)
 const pageSize = ref(5)
 
-// 计算当前页显示的数据
 const currentList = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
   return list.value.slice(start, end)
 })
 
-// 分页事件处理
 function handleSizeChange(size: number) {
   pageSize.value = size
   currentPage.value = 1
@@ -73,6 +70,10 @@ async function refresh() {
   loading.value = true
   try {
     list.value = await getSchedules()
+    const maxPage = Math.max(1, Math.ceil(list.value.length / pageSize.value))
+    if (currentPage.value > maxPage) {
+      currentPage.value = maxPage
+    }
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : String(e))
   } finally {
@@ -104,6 +105,7 @@ async function submitCreate() {
     await createSchedule(body)
     ElMessage.success('已创建')
     createOpen.value = false
+    currentPage.value = 1
     await refresh()
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : String(e))
@@ -225,14 +227,14 @@ onMounted(() => {
           <template #default="scope">
             <el-space :direction="mobile ? 'vertical' : 'horizontal'" :size="4">
               <el-button
-  size="small"
-  text
-  type="primary"
-  :loading="toggleLoadingMap[scope.row.id!]"
-  @click="toggleStatus(scope.row)"
->
-  {{ scope.row.status === 'active' ? '暂停' : '启用' }}
-</el-button>
+                size="small"
+                text
+                type="primary"
+                :loading="toggleLoadingMap[scope.row.id!]"
+                @click="toggleStatus(scope.row)"
+              >
+                {{ scope.row.status === 'active' ? '暂停' : '启用' }}
+              </el-button>
               <el-button size="small" text type="info" @click="openLogs(scope.row)" v-if="!mobile">日志</el-button>
               <el-button size="small" text type="danger" @click="remove(scope.row)">删除</el-button>
             </el-space>
@@ -240,19 +242,19 @@ onMounted(() => {
         </el-table-column>
       </el-table>
     </div>
-    
-    <!-- 分页组件 -->
-    <div v-if="list.length > 2" style="display: flex; justify-content: center; margin-top: 12px;">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[5, 10, 20]"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="list.length"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
+
+    <el-pagination
+      v-model:current-page="currentPage"
+      v-model:page-size="pageSize"
+      :page-sizes="[5, 10, 20, 50]"
+      :small="mobile"
+      :layout="mobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper'"
+      :total="list.length"
+      :hide-on-single-page="true"
+      @size-change="handleSizeChange"
+      @current-change="handleCurrentChange"
+      style="margin-top: 12px; justify-content: center"
+    />
 
     <el-dialog v-model="createOpen" :title="createTitle" :width="mobile ? '90%' : '720px'" @closed="resetForm">
       <el-form label-position="top">
@@ -287,40 +289,39 @@ onMounted(() => {
     </el-dialog>
 
     <el-dialog v-model="logsOpen" title="执行日志" :width="mobile ? '90%' : '820px'">
-  <template #header>
-    <div style="font-weight: 600">执行日志</div>
-  </template>
-
-  <el-table :data="pagedLogs" style="width: 100%" size="small" :loading="logsLoading">
-    <el-table-column label="序号" width="60" align="center">
-      <template #default="scope">
-        {{ (logsCurrentPage - 1) * logsPageSize + scope.$index + 1 }}
+      <template #header>
+        <div style="font-weight: 600">执行日志</div>
       </template>
-    </el-table-column>
-    <el-table-column label="时间" :width="mobile ? 140 : 180">
-      <template #default="scope">
-        <span>{{ formatDateTime(scope.row.executed_at) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="status" label="状态" :width="mobile ? 90 : 110" />
-    <el-table-column prop="batch_id" label="batch_id" :min-width="mobile ? 120 : 220" show-overflow-tooltip />
-    <el-table-column prop="error" label="错误" :min-width="mobile ? 120 : 240" show-overflow-tooltip />
-  </el-table>
 
-  <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center">
-    <div style="font-size: 13px; color: var(--el-text-color-secondary)">
-      共 {{ logs.length }} 条
-    </div>
-    <el-pagination
-      v-model:current-page="logsCurrentPage"
-      v-model:page-size="logsPageSize"
-      :total="logs.length"
-      layout="prev, pager, next"
-      size="small"
-      :hide-on-single-page="true"
-    />
-  </div>
-</el-dialog>
+      <el-table :data="pagedLogs" style="width: 100%" size="small" :loading="logsLoading">
+        <el-table-column label="序号" width="60" align="center">
+          <template #default="scope">
+            {{ (logsCurrentPage - 1) * logsPageSize + scope.$index + 1 }}
+          </template>
+        </el-table-column>
+        <el-table-column label="时间" :width="mobile ? 140 : 180">
+          <template #default="scope">
+            <span>{{ formatDateTime(scope.row.executed_at) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" :width="mobile ? 90 : 110" />
+        <el-table-column prop="batch_id" label="batch_id" :min-width="mobile ? 120 : 220" show-overflow-tooltip />
+        <el-table-column prop="error" label="错误" :min-width="mobile ? 120 : 240" show-overflow-tooltip />
+      </el-table>
+
+      <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center">
+        <div style="font-size: 13px; color: var(--el-text-color-secondary)">
+          共 {{ logs.length }} 条
+        </div>
+        <el-pagination
+          v-model:current-page="logsCurrentPage"
+          v-model:page-size="logsPageSize"
+          :total="logs.length"
+          layout="prev, pager, next"
+          size="small"
+          :hide-on-single-page="true"
+        />
+      </div>
+    </el-dialog>
   </div>
 </template>
-

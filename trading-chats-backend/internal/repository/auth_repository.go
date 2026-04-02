@@ -146,6 +146,11 @@ func (r *AuthRepository) GetUserByID(ctx context.Context, id string) (*models.Us
 	return &user, nil
 }
 
+func (r *AuthRepository) UpdateUserPassword(ctx context.Context, userID, passwordHash string) error {
+	_, err := r.usersCollection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$set": bson.M{"password_hash": passwordHash, "updated_at": utils.NowString()}})
+	return err
+}
+
 func (r *AuthRepository) UpdateUserLastLogin(ctx context.Context, userID string) error {
 	_, err := r.usersCollection.UpdateOne(ctx, bson.M{"_id": userID}, bson.M{"$set": bson.M{"last_login_at": utils.NowString(), "updated_at": utils.NowString()}})
 	return err
@@ -178,6 +183,11 @@ func (r *AuthRepository) GetSessionByRefreshToken(ctx context.Context, token str
 
 func (r *AuthRepository) DeleteSessionByRefreshToken(ctx context.Context, token string) error {
 	_, err := r.sessionsCollection.DeleteOne(ctx, bson.M{"refresh_token": token})
+	return err
+}
+
+func (r *AuthRepository) DeleteSessionsByUserID(ctx context.Context, userID string) error {
+	_, err := r.sessionsCollection.DeleteMany(ctx, bson.M{"user_id": userID})
 	return err
 }
 

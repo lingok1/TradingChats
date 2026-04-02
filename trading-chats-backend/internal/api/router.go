@@ -44,6 +44,7 @@ func SetupRoutes(
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.RefreshToken)
 			auth.POST("/logout", authHandler.Logout)
+			auth.POST("/reset-password", authHandler.ResetPassword)
 		}
 
 		promptTemplates := api.Group("/prompt-templates")

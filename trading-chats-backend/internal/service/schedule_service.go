@@ -84,7 +84,7 @@ func (s *ScheduleService) removeTaskFromCron(configID string) {
 }
 
 func (s *ScheduleService) executeTask(ctx context.Context, config models.ScheduleConfig, triggerType string) {
-	taskCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	taskCtx, cancel := context.WithTimeout(ctx, 8*time.Minute)
 	defer cancel()
 	log.Printf("Executing scheduled task: %s (TemplateID: %s, TriggerType: %s)\n", config.Name, config.TemplateID, triggerType)
 	batchID, prompt, err := s.aiResponseService.GenerateBatchAIResponses(taskCtx, config.TemplateID)

@@ -9,10 +9,12 @@ import DynamicParamsPanel from './settings/DynamicParamsPanel.vue'
 const props = defineProps<{
   modelValue: boolean
   mobile: boolean
+  username?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
+  (e: 'logout'): void
 }>()
 
 const open = computed({
@@ -27,8 +29,12 @@ const active = ref<'system' | 'params' | 'templates' | 'models' | 'schedules'>('
 <template>
   <el-drawer v-model="open" direction="rtl" :size="drawerSize">
     <template #header>
-      <div style="display: flex; align-items: center; gap: 10px">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding-right: 8px; flex-wrap: wrap;">
         <div style="font-weight: 600">设置</div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span v-if="username" style="font-size: 13px; color: var(--el-text-color-regular);">当前用户：{{ username }}</span>
+          <el-button size="small" @click="emit('logout')">退出登录</el-button>
+        </div>
       </div>
     </template>
 

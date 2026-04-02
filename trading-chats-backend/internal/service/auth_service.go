@@ -191,6 +191,36 @@ func (s *AuthService) Logout(ctx context.Context, req *models.LogoutRequest) err
 	return s.repo.DeleteSessionByRefreshToken(ctx, req.RefreshToken)
 }
 
+func (s *AuthService) ResetPassword(ctx context.Context, req *models.ResetPasswordRequest) error {
+	if req == nil {
+		return errors.New("invalid reset password request")
+	}
+
+	username := strings.TrimSpace(req.Username)
+	newPassword := strings.TrimSpace(req.NewPassword)
+	if username == "" || newPassword == "" {
+		return errors.New("username and new_password are required")
+	}
+
+	user, err := s.repo.GetUserByUsername(ctx, username)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
+	passwordHash, err := HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.UpdateUserPassword(ctx, user.ID, passwordHash); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteSessionsByUserID(ctx, user.ID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *AuthService) ValidateAccessToken(ctx context.Context, accessToken string) (*models.AuthContext, error) {
 	claims := jwt.MapClaims{}
 	token, err := jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (interface{}, error) {

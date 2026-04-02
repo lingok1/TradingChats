@@ -14,18 +14,15 @@ const props = defineProps<{
 const loading = ref(false)
 const list = ref<PromptTemplate[]>([])
 
-// 分页相关
 const currentPage = ref(1)
 const pageSize = ref(5)
 
-// 计算当前页显示的数据
 const currentList = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
   return list.value.slice(start, end)
 })
 
-// 分页事件处理
 function handleSizeChange(size: number) {
   pageSize.value = size
   currentPage.value = 1
@@ -64,6 +61,39 @@ function tagsArray() {
     .split(',')
     .map((t) => t.trim())
     .filter((t) => t.length > 0)
+}
+
+async function copyGeneratedResult() {
+  const text = generatedResult.value.trim()
+  if (!text) {
+    ElMessage.warning('没有可复制的内容')
+    return
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.setAttribute('readonly', 'true')
+      textarea.style.position = 'fixed'
+      textarea.style.top = '0'
+      textarea.style.left = '0'
+      textarea.style.opacity = '0'
+      textarea.style.pointerEvents = 'none'
+      document.body.appendChild(textarea)
+      textarea.focus()
+      textarea.select()
+      textarea.setSelectionRange(0, textarea.value.length)
+      const success = document.execCommand('copy')
+      document.body.removeChild(textarea)
+      if (!success) throw new Error('copy failed')
+    }
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
+  }
 }
 
 async function refresh() {
@@ -217,18 +247,17 @@ onMounted(() => {
       </el-table>
     </div>
     
-    <!-- 分页组件 -->
-    <div v-if="list.length > 2" style="display: flex; justify-content: center; margin-top: 12px;">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[5, 10, 20]"
-        layout="total, sizes, prev, pager, next, jumper"
-        :total="list.length"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
+    <el-pagination
+      v-model:current-page="currentPage"
+      v-model:page-size="pageSize"
+      :page-sizes="[5, 10, 20, 50]"
+      :small="mobile"
+      :layout="mobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper'"
+      :total="list.length"
+      @size-change="handleSizeChange"
+      @current-change="handleCurrentChange"
+      style="margin-top: 12px; justify-content: center"
+    />
 
     <el-dialog v-model="dialogOpen" :title="dialogTitle" :width="mobile ? '90%' : '680px'" @closed="resetForm">
       <el-form label-position="top">
@@ -267,9 +296,11 @@ onMounted(() => {
         {{ generatedResult }}
       </div>
       <template #footer>
-        <el-button type="primary" @click="resultDialogOpen = false">确定</el-button>
+        <el-space>
+          <el-button @click="copyGeneratedResult">复制</el-button>
+          <el-button type="primary" @click="resultDialogOpen = false">确定</el-button>
+        </el-space>
       </template>
     </el-dialog>
   </div>
 </template>
-

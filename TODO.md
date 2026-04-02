@@ -4,6 +4,7 @@
 - 响应的结果前端展示需要带正则匹配（例如| 序号 |和\n| 1 |）才展示
 - 模版生成，复制模版生成的内容到粘贴板（兼容pc和移动端）
 - 模型配置的测试不知道测试单一还是全部接口
+- 上划到顶部（兼容pc和移动端）
 - 设置接入鉴权功能，修改和删除的接口需要进行鉴权操作
 
 ## 后端
@@ -13,16 +14,4 @@
 - 添加登录鉴权和多租户功能，修改和删除的接口需要进行鉴权操作，更新swagger接口文档，添加一个管理员和两个租户，给默认的账号密码
 
 <br />
-
-## 备忘
-
-```json
-{
-  "tenant_name": "Tenant Gamma",
-  "tenant_code": "tenant_gamma",
-  "username": "tenant_gamma",
-  "password": "TenantGamma@123456",
-  "display_name": "Tenant Gamma Admin"
-}
-```
 

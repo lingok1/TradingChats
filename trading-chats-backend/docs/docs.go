@@ -361,6 +361,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/auth/reset-password": {
+            "post": {
+                "description": "使用用户名直接重置密码，并使该用户全部会话失效",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "鉴权"
+                ],
+                "summary": "重置密码",
+                "parameters": [
+                    {
+                        "description": "重置密码请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ResetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/model-api-configs": {
             "get": {
                 "description": "获取所有模型与API配置列表",
@@ -1516,6 +1556,21 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tenant_name": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ResetPasswordRequest": {
+            "type": "object",
+            "required": [
+                "new_password",
+                "username"
+            ],
+            "properties": {
+                "new_password": {
                     "type": "string"
                 },
                 "username": {

@@ -27,11 +27,16 @@ const html = computed(() => md.render(normalizeMarkdown(props.markdown)))
 <style scoped>
 .tc-markdown-wrap {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
 
 .tc-markdown {
-  min-width: max-content;
+  display: inline-block;
+  min-width: 100%;
 }
 
 .tc-markdown :deep(table) {
@@ -40,17 +45,21 @@ const html = computed(() => md.render(normalizeMarkdown(props.markdown)))
   border-collapse: collapse;
 }
 
-.tc-markdown :deep(th),
+.tc-markdown :deep(th) {
+  border: 1px solid var(--el-border-color);
+  padding: 8px 10px;
+  vertical-align: top;
+  text-align: left;
+  white-space: nowrap;
+  background: var(--el-fill-color-light);
+}
+
 .tc-markdown :deep(td) {
   border: 1px solid var(--el-border-color);
   padding: 8px 10px;
   vertical-align: top;
   text-align: left;
   white-space: nowrap;
-}
-
-.tc-markdown :deep(th) {
-  background: var(--el-fill-color-light);
 }
 
 .tc-markdown :deep(p) {

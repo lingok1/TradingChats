@@ -120,3 +120,28 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	c.JSON(http.StatusOK, models.SuccessResponse("logout success"))
 }
+
+// ResetPassword 重置密码
+// @Summary 重置密码
+// @Description 使用用户名直接重置密码，并使该用户全部会话失效
+// @Tags 鉴权
+// @Accept json
+// @Produce json
+// @Param body body models.ResetPasswordRequest true "重置密码请求"
+// @Success 200 {object} models.Response
+// @Failure 400 {object} models.Response
+// @Router /api/auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req models.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(400, err.Error()))
+		return
+	}
+
+	if err := h.service.ResetPassword(c.Request.Context(), &req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(400, err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse("password reset success"))
+}

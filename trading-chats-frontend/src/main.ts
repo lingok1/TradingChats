@@ -1,8 +1,21 @@
 import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import './style.css'
 import App from './App.vue'
 
-createApp(App).use(ElementPlus).mount('#app')
+const locale = {
+  ...zhCn,
+  el: {
+    ...zhCn.el,
+    pagination: {
+      ...zhCn.el.pagination,
+      goto: '跳转到',
+      total: '共 {total} 条',
+    },
+  },
+}
+
+createApp(App).use(ElementPlus, { locale }).mount('#app')
