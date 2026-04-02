@@ -1,136 +1,106 @@
-# 凌期AI辅助期货挑选品种和持仓止盈止损分析程序
+# Trading Chats Backend
 
-## 项目简介
+Trading Chats 后端服务，提供提示词模板、模型 API 配置、AI 批量生成、定时任务、系统配置、登录鉴权与基础多租户隔离能力。
 
-这是一个基于Golang和Gin框架的后端应用程序，用于辅助期货挑选品种和持仓止盈止损分析。该程序通过调用AI模型生成分析结果，帮助用户做出更明智的交易决策。
+## 功能概览
 
-## 技术栈
+- 用户登录、Token 刷新与会话管理
+- 管理员与租户角色控制
+- 多租户数据隔离（业务集合按 tenant_id 过滤）
+- 提示词模板管理与动态 Prompt 生成
+- 模型 API 配置管理与连接测试
+- AI 批量生成与批次查询
+- 定时任务配置、手动触发与执行日志
+- 系统基础配置、动态参数、运行时参数管理
+- Swagger 文档与健康检查接口
 
-- **语言**: Go 1.20
-- **框架**: Gin
-- **数据库**: MongoDB, Redis
-- **API文档**: Swagger
+## 运行环境
 
-## 安装步骤
+- Go 1.23+
+- MongoDB
+- Redis
 
-1. **克隆项目**
+## 环境变量
 
-   ```bash
-   git clone <repository-url>
-   cd trading-chats-backend
-   ```
+| 变量名 | 默认值 | 说明 |
+|---|---|---|
+| PORT | 8080 | 服务端口 |
+| MONGODB_URI | mongodb://localhost:27017 | MongoDB 连接地址 |
+| MONGODB_DATABASE | trading_chats | MongoDB 数据库名 |
+| REDIS_URI | redis://localhost:6379/0 | Redis 连接地址 |
+| JWT_SECRET | change_me_in_production | JWT 密钥，生产环境必须覆盖 |
+| JWT_EXPIRATION | 24h | Access Token 过期时间 |
+| API_TIMEOUT | 60s | 外部模型 API 超时时间 |
+| SEED_ADMIN_PASSWORD | Admin@123456 | 管理员种子密码，建议生产覆盖 |
+| SEED_TENANT_ALPHA_PASSWORD | TenantAlpha@123456 | 租户 Alpha 种子密码 |
+| SEED_TENANT_BETA_PASSWORD | TenantBeta@123456 | 租户 Beta 种子密码 |
 
-2. **安装依赖**
-
-   ```bash
-   go mod download
-   ```
-
-3. **配置环境变量**
-
-   复制 `.env.example` 文件为 `.env` 并根据实际情况修改配置：
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   主要配置项：
-   - `PORT`: 服务器端口
-   - `MONGODB_URI`: MongoDB连接地址
-   - `MONGODB_DATABASE`: MongoDB数据库名称
-   - `REDIS_URI`: Redis连接地址
-
-## 运行方法
-
-### 开发环境
+## 本地启动
 
 ```bash
+go mod tidy
 go run cmd/api/main.go
 ```
 
-### 生产环境
+服务默认地址：
 
-1. **构建可执行文件**
+- API: `http://localhost:8080`
+- Swagger: `http://localhost:8080/swagger/index.html`
+- Health: `http://localhost:8080/health`
 
-   ```bash
-   go build -o trading-chats-api cmd/api/main.go
-   ```
+## 默认账户
 
-2. **运行可执行文件**
+系统启动时会初始化 1 个管理员账号和 2 个租户账号：
 
-   ```bash
-   ./trading-chats-api
-   ```
+- 管理员：`admin`
+- 租户 Alpha：`tenant_alpha`
+- 租户 Beta：`tenant_beta`
 
-## API端点文档
+默认密码可通过环境变量覆盖，生产环境必须修改。
 
-启动服务后，可以通过以下地址访问Swagger API文档：
+## 鉴权说明
 
-```
-http://localhost:8080/swagger/index.html
-```
+### 公开接口
 
-主要API端点：
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- 查询类 GET 接口
+- `/health`
+- `/swagger/*`
 
-### 提示词模版
+### 受保护接口
 
-- `POST /api/prompt-templates`: 创建提示词模版
-- `GET /api/prompt-templates`: 获取所有提示词模版
-- `GET /api/prompt-templates/tag`: 根据标签获取提示词模版
-- `GET /api/prompt-templates/{id}`: 根据ID获取提示词模版
-- `PUT /api/prompt-templates/{id}`: 更新提示词模版
-- `DELETE /api/prompt-templates/{id}`: 删除提示词模版
-- `POST /api/prompt-templates/generate`: 动态生成提示词
+以下接口需要 `Authorization: Bearer <token>`：
 
-### 模型与API配置
+- 所有创建类 POST 接口
+- 所有修改类 PUT 接口
+- 所有删除类 DELETE 接口
+- Prompt 生成、模型连接测试、AI 生成、定时任务手动触发
 
-- `POST /api/model-api-configs`: 创建模型与API配置
-- `GET /api/model-api-configs`: 获取所有模型与API配置
-- `GET /api/model-api-configs/provider`: 根据提供商获取模型与API配置
-- `GET /api/model-api-configs/{id}`: 根据ID获取模型与API配置
-- `PUT /api/model-api-configs/{id}`: 更新模型与API配置
-- `DELETE /api/model-api-configs/{id}`: 删除模型与API配置
-- `POST /api/model-api-configs/{id}/test`: 测试模型的连通性
+## 多租户说明
 
-### AI响应信息
+当前业务集合已接入 `tenant_id` 过滤：
 
-- `GET /api/ai-responses`: 获取所有AI响应信息
-- `GET /api/ai-responses/batch`: 根据批次ID获取AI响应信息
-- `GET /api/ai-responses/{id}`: 根据ID获取AI响应信息
-- `POST /api/ai-responses/generate`: 生成批次AI响应
+- prompt_templates
+- model_api_configs
+- ai_responses
+- schedule_configs
+- schedule_logs
 
-## 测试说明
+规则：
 
-### 运行单元测试
+- 管理员可跨租户访问
+- 普通租户仅可访问本租户数据
+
+注意：`system_configs` 当前仍为全局单例配置，不区分租户。
+
+## 测试
+
+当前建议执行：
 
 ```bash
 go test ./...
 ```
 
-### 测试数据库连接
-
-启动服务后，可以通过以下端点测试数据库连接：
-
-```
-http://localhost:8080/health
-```
-
-## 项目结构
-
-```
-trading-chats-backend/
-├── cmd/
-│   └── api/            # 应用程序入口
-├── internal/
-│   ├── api/            # HTTP处理程序和路由
-│   ├── config/         # 配置管理
-│   ├── db/             # 数据库连接
-│   ├── models/         # 数据模型
-│   ├── repository/     # 数据访问层
-│   ├── service/        # 业务逻辑层
-│   └── utils/          # 工具函数
-├── pkg/                # 可重用包
-├── .env                # 环境变量
-├── go.mod              # Go模块文件
-└── README.md           # 项目说明
-```
+如本机缺少对应 Go toolchain，请先安装匹配版本后再运行。

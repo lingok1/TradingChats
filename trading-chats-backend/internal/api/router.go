@@ -1,103 +1,120 @@
 package api
 
 import (
+	"time"
+	"trading-chats-backend/internal/models"
 	"trading-chats-backend/internal/service"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// SetupRouter 配置路由
-func SetupRouter(
+func SetupRoutes(
+	r *gin.Engine,
 	promptTemplateService *service.PromptTemplateService,
 	modelAPIService *service.ModelAPIService,
 	aiResponseService *service.AIResponseService,
 	scheduleService *service.ScheduleService,
 	systemConfigService service.SystemConfigService,
-) *gin.Engine {
-	r := gin.Default()
-
-	// 配置CORS
+	authService *service.AuthService,
+) {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
 	}))
 
-	// 健康检查
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status": "ok",
-		})
-	})
+	r.GET("/health", Health)
 
-	// Swagger文档
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	promptTemplateHandler := NewPromptTemplateHandler(promptTemplateService)
+	modelAPIHandler := NewModelAPIHandler(modelAPIService)
+	aiResponseHandler := NewAIResponseHandler(aiResponseService)
+	scheduleHandler := NewScheduleHandler(scheduleService)
+	systemConfigHandler := NewSystemConfigHandler(systemConfigService)
+	authHandler := NewAuthHandler(authService)
 
-	// API路由组
 	api := r.Group("/api")
 	{
-		// 提示词模版路由
-		promptTemplateHandler := NewPromptTemplateHandler(promptTemplateService)
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/refresh", authHandler.RefreshToken)
+			auth.POST("/logout", authHandler.Logout)
+		}
+
 		promptTemplates := api.Group("/prompt-templates")
 		{
-			promptTemplates.POST("", promptTemplateHandler.CreatePromptTemplate)
 			promptTemplates.GET("", promptTemplateHandler.GetAllPromptTemplates)
 			promptTemplates.GET("/tag", promptTemplateHandler.GetPromptTemplatesByTag)
 			promptTemplates.GET("/:id", promptTemplateHandler.GetPromptTemplateByID)
-			promptTemplates.PUT("/:id", promptTemplateHandler.UpdatePromptTemplate)
-			promptTemplates.DELETE("/:id", promptTemplateHandler.DeletePromptTemplate)
-			promptTemplates.POST("/generate", promptTemplateHandler.GeneratePrompt)
 		}
 
-		// 模型与API配置路由
-		modelAPIHandler := NewModelAPIHandler(modelAPIService)
 		modelAPIConfigs := api.Group("/model-api-configs")
 		{
-			modelAPIConfigs.POST("", modelAPIHandler.CreateModelAPIConfig)
 			modelAPIConfigs.GET("", modelAPIHandler.GetAllModelAPIConfigs)
 			modelAPIConfigs.GET("/provider", modelAPIHandler.GetModelAPIConfigsByProvider)
 			modelAPIConfigs.GET("/:id", modelAPIHandler.GetModelAPIConfigByID)
-			modelAPIConfigs.PUT("/:id", modelAPIHandler.UpdateModelAPIConfig)
-			modelAPIConfigs.DELETE("/:id", modelAPIHandler.DeleteModelAPIConfig)
-			modelAPIConfigs.POST("/:id/test", modelAPIHandler.TestModelConnectivity)
 		}
 
-		// AI响应信息路由
-		aiResponseHandler := NewAIResponseHandler(aiResponseService)
 		aiResponses := api.Group("/ai-responses")
 		{
 			aiResponses.GET("", aiResponseHandler.GetAllAIResponses)
 			aiResponses.GET("/batch", aiResponseHandler.GetAIResponsesByBatchID)
 			aiResponses.GET("/latest", aiResponseHandler.GetLatestSuccessfulBatch)
 			aiResponses.GET("/:id", aiResponseHandler.GetAIResponseByID)
-			aiResponses.POST("/generate", aiResponseHandler.GenerateBatchAIResponses)
 		}
 
-		// 定时任务配置路由
-		scheduleHandler := NewScheduleHandler(scheduleService)
 		schedules := api.Group("/schedules")
 		{
-			schedules.POST("", scheduleHandler.CreateConfig)
 			schedules.GET("", scheduleHandler.GetConfigs)
-			schedules.PUT("/:id/status", scheduleHandler.UpdateConfigStatus)
-			schedules.DELETE("/:id", scheduleHandler.DeleteConfig)
 			schedules.GET("/:id/logs", scheduleHandler.GetLogsByConfigID)
 		}
 
-		// 系统配置路由
-		systemConfigHandler := NewSystemConfigHandler(systemConfigService)
 		systemConfig := api.Group("/system-config")
 		{
 			systemConfig.GET("", systemConfigHandler.GetConfig)
-			systemConfig.PUT("/basic", systemConfigHandler.SaveBasicConfig)
-			systemConfig.PUT("/parameters", systemConfigHandler.SaveParameters)
 		}
 	}
 
+	protected := r.Group("/api")
+	protected.Use(AuthMiddleware(authService))
+	{
+		protected.POST("/prompt-templates", RequireRoles(models.RoleAdmin, models.RoleTenant), promptTemplateHandler.CreatePromptTemplate)
+		protected.PUT("/prompt-templates/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), promptTemplateHandler.UpdatePromptTemplate)
+		protected.DELETE("/prompt-templates/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), promptTemplateHandler.DeletePromptTemplate)
+		protected.POST("/prompt-templates/generate", RequireRoles(models.RoleAdmin, models.RoleTenant), promptTemplateHandler.GeneratePrompt)
+
+		protected.POST("/model-api-configs", RequireRoles(models.RoleAdmin, models.RoleTenant), modelAPIHandler.CreateModelAPIConfig)
+		protected.PUT("/model-api-configs/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), modelAPIHandler.UpdateModelAPIConfig)
+		protected.DELETE("/model-api-configs/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), modelAPIHandler.DeleteModelAPIConfig)
+		protected.POST("/model-api-configs/:id/test", RequireRoles(models.RoleAdmin, models.RoleTenant), modelAPIHandler.TestModelConnectivity)
+
+		protected.POST("/ai-responses/generate", RequireRoles(models.RoleAdmin, models.RoleTenant), aiResponseHandler.GenerateBatchAIResponses)
+
+		protected.POST("/schedules", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.CreateConfig)
+		protected.PUT("/schedules/:id/status", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.UpdateConfigStatus)
+		protected.DELETE("/schedules/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.DeleteConfig)
+		protected.POST("/schedules/:id/trigger", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.TriggerNow)
+
+		protected.PUT("/system-config/basic", RequireRoles(models.RoleAdmin), systemConfigHandler.SaveBasicConfig)
+		protected.PUT("/system-config/parameters", RequireRoles(models.RoleAdmin, models.RoleTenant), systemConfigHandler.SaveParameters)
+		protected.PUT("/system-config/runtime", RequireRoles(models.RoleAdmin, models.RoleTenant), systemConfigHandler.SaveRuntimeConfig)
+	}
+}
+
+func SetupRouter(
+	promptTemplateService *service.PromptTemplateService,
+	modelAPIService *service.ModelAPIService,
+	aiResponseService *service.AIResponseService,
+	scheduleService *service.ScheduleService,
+	systemConfigService service.SystemConfigService,
+	authService *service.AuthService,
+) *gin.Engine {
+	r := gin.Default()
+	SetupRoutes(r, promptTemplateService, modelAPIService, aiResponseService, scheduleService, systemConfigService, authService)
 	return r
 }

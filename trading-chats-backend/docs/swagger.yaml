@@ -1,16 +1,27 @@
-basePath: /api
+basePath: /
 definitions:
   models.GenerateAIRequest:
     properties:
-      param1:
-        example: https://api.example.com/data1
-        type: string
-      param2:
-        example: https://api.example.com/data2
-        type: string
       template_id:
         example: 69b4e08fbd4f24a37ff0a0cc
         type: string
+    type: object
+  models.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
     type: object
   models.ModelAPIConfig:
     properties:
@@ -22,14 +33,14 @@ definitions:
       id:
         type: string
       models:
-        description: 一次可添加多个模型名称
         items:
           type: string
         type: array
       name:
         type: string
       provider:
-        description: anthropic, openai
+        type: string
+      tenant_id:
         type: string
       updated_at: {}
     type: object
@@ -43,11 +54,38 @@ definitions:
       name:
         type: string
       tags:
-        description: 股票、期货、期权等
         items:
           type: string
         type: array
+      tenant_id:
+        type: string
       updated_at: {}
+    type: object
+  models.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  models.RegisterRequest:
+    properties:
+      display_name:
+        type: string
+      password:
+        type: string
+      tenant_code:
+        type: string
+      tenant_name:
+        type: string
+      username:
+        type: string
+    required:
+    - display_name
+    - password
+    - tenant_code
+    - tenant_name
+    - username
     type: object
   models.Response:
     properties:
@@ -71,55 +109,40 @@ definitions:
           type: string
         type: object
     type: object
+  models.SaveSystemRuntimeConfigRequest:
+    properties:
+      param1:
+        type: string
+      param2:
+        type: string
+    type: object
   models.ScheduleConfig:
     properties:
       created_at: {}
       cron_expr:
-        description: cron表达式，如 "*/10 * * * *"
         type: string
       id:
         type: string
       name:
         type: string
-      param1:
-        description: 参数1
-        type: string
-      param2:
-        description: 参数2
-        type: string
       status:
-        description: 'active: 启用, paused: 暂停'
         type: string
       template_id:
-        description: 关联的提示词模版ID
+        type: string
+      tenant_id:
         type: string
       updated_at: {}
-    type: object
-  models.SystemConfig:
-    properties:
-      id:
-        type: string
-      parameters:
-        additionalProperties:
-          type: string
-        type: object
-      system_logo:
-        type: string
-      system_title:
-        type: string
-      updated_at:
-        type: string
     type: object
 host: localhost:8080
 info:
   contact: {}
-  description: 凌期AI辅助期货挑选品种和持仓止盈止损分析程序API文档
-  title: 凌期AI辅助期货挑选品种和持仓止盈止损分析程序
+  description: Trading Chats 后端服务接口文档
+  title: Trading Chats Backend API
   version: "1.0"
 paths:
-  /ai-responses:
+  /api/ai-responses:
     get:
-      description: 获取所有AI响应信息列表
+      description: 获取当前可见的 AI 响应列表
       produces:
       - application/json
       responses:
@@ -131,14 +154,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 获取所有AI响应信息
+      summary: 获取 AI 响应列表
       tags:
-      - AI响应信息
-  /ai-responses/{id}:
+      - AI响应
+  /api/ai-responses/{id}:
     get:
-      description: 根据ID获取AI响应信息详情
+      description: 根据 ID 获取 AI 响应详情
       parameters:
-      - description: AI响应信息ID
+      - description: AI 响应ID
         in: path
         name: id
         required: true
@@ -150,24 +173,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.Response'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 根据ID获取AI响应信息
+      summary: 获取 AI 响应详情
       tags:
-      - AI响应信息
-  /ai-responses/batch:
+      - AI响应
+  /api/ai-responses/batch:
     get:
-      description: 根据批次ID获取AI响应信息列表
+      description: 根据 batch_id 获取 AI 响应列表
       parameters:
       - description: 批次ID
         in: query
@@ -185,18 +200,18 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 根据批次ID获取AI响应信息
+      summary: 按批次获取 AI 响应
       tags:
-      - AI响应信息
-  /ai-responses/generate:
+      - AI响应
+  /api/ai-responses/generate:
     post:
       consumes:
       - application/json
-      description: 根据提示词模版和参数生成批次AI响应
+      description: 根据模板生成一批 AI 响应
       parameters:
-      - description: 生成批次AI响应请求
+      - description: 生成请求
         in: body
-        name: request
+        name: body
         required: true
         schema:
           $ref: '#/definitions/models.GenerateAIRequest'
@@ -215,12 +230,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 生成批次AI响应
+      security:
+      - BearerAuth: []
+      summary: 生成 AI 响应
       tags:
-      - AI响应信息
-  /ai-responses/latest:
+      - AI响应
+  /api/ai-responses/latest:
     get:
-      description: 获取最近一次状态为 completed 的完整批次 AI 响应列表
+      description: 获取最近成功生成的 AI 响应批次
       produces:
       - application/json
       responses:
@@ -232,14 +249,122 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
+      summary: 获取最近成功批次
+      tags:
+      - AI响应
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 使用用户名与密码获取访问令牌
+      parameters:
+      - description: 登录请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 获取最近一次成功的批次数据
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 用户登录
       tags:
-      - AI响应信息
-  /model-api-configs:
+      - 鉴权
+  /api/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: 使用 refresh token 注销当前会话
+      parameters:
+      - description: 登出请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 用户登出
+      tags:
+      - 鉴权
+  /api/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: 使用 refresh token 获取新的访问令牌
+      parameters:
+      - description: 刷新令牌请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 刷新令牌
+      tags:
+      - 鉴权
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: 创建租户与租户管理员账号，并直接返回登录令牌
+      parameters:
+      - description: 注册请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 用户注册
+      tags:
+      - 鉴权
+  /api/model-api-configs:
     get:
       description: 获取所有模型与API配置列表
       produces:
@@ -282,10 +407,12 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
       summary: 创建模型与API配置
       tags:
       - 模型与API配置
-  /model-api-configs/{id}:
+  /api/model-api-configs/{id}:
     delete:
       description: 删除模型与API配置
       parameters:
@@ -309,6 +436,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
       summary: 删除模型与API配置
       tags:
       - 模型与API配置
@@ -373,10 +502,12 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
       summary: 更新模型与API配置
       tags:
       - 模型与API配置
-  /model-api-configs/{id}/test:
+  /api/model-api-configs/{id}/test:
     post:
       description: 测试模型与API的连通性
       parameters:
@@ -400,10 +531,12 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
       summary: 测试模型的连通性
       tags:
       - 模型与API配置
-  /model-api-configs/provider:
+  /api/model-api-configs/provider:
     get:
       description: 根据提供商获取模型与API配置列表
       parameters:
@@ -426,9 +559,9 @@ paths:
       summary: 根据提供商获取模型与API配置
       tags:
       - 模型与API配置
-  /prompt-templates:
+  /api/prompt-templates:
     get:
-      description: 获取所有提示词模版列表
+      description: 获取当前可见的提示词模板列表
       produces:
       - application/json
       responses:
@@ -440,25 +573,25 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 获取所有提示词模版
+      summary: 获取提示词模板列表
       tags:
-      - 提示词模版
+      - 提示词模板
     post:
       consumes:
       - application/json
-      description: 创建新的提示词模版
+      description: 创建新的提示词模板
       parameters:
-      - description: 提示词模版信息
+      - description: 提示词模板
         in: body
-        name: template
+        name: body
         required: true
         schema:
           $ref: '#/definitions/models.PromptTemplate'
       produces:
       - application/json
       responses:
-        "201":
-          description: Created
+        "200":
+          description: OK
           schema:
             $ref: '#/definitions/models.Response'
         "400":
@@ -469,14 +602,16 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 创建提示词模版
+      security:
+      - BearerAuth: []
+      summary: 创建提示词模板
       tags:
-      - 提示词模版
-  /prompt-templates/{id}:
+      - 提示词模板
+  /api/prompt-templates/{id}:
     delete:
-      description: 删除提示词模版
+      description: 根据 ID 删除提示词模板
       parameters:
-      - description: 提示词模版ID
+      - description: 提示词模板ID
         in: path
         name: id
         required: true
@@ -488,21 +623,19 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.Response'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 删除提示词模版
+      security:
+      - BearerAuth: []
+      summary: 删除提示词模板
       tags:
-      - 提示词模版
+      - 提示词模板
     get:
-      description: 根据ID获取提示词模版详情
+      description: 根据 ID 获取提示词模板
       parameters:
-      - description: 提示词模版ID
+      - description: 提示词模板ID
         in: path
         name: id
         required: true
@@ -514,34 +647,26 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.Response'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 根据ID获取提示词模版
+      summary: 获取提示词模板详情
       tags:
-      - 提示词模版
+      - 提示词模板
     put:
       consumes:
       - application/json
-      description: 更新提示词模版信息
+      description: 根据 ID 更新提示词模板
       parameters:
-      - description: 提示词模版ID
+      - description: 提示词模板ID
         in: path
         name: id
         required: true
         type: string
-      - description: 提示词模版信息
+      - description: 提示词模板
         in: body
-        name: template
+        name: body
         required: true
         schema:
           $ref: '#/definitions/models.PromptTemplate'
@@ -560,18 +685,20 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 更新提示词模版
+      security:
+      - BearerAuth: []
+      summary: 更新提示词模板
       tags:
-      - 提示词模版
-  /prompt-templates/generate:
+      - 提示词模板
+  /api/prompt-templates/generate:
     post:
       consumes:
       - application/json
-      description: 根据提示词模版和参数动态生成提示词
+      description: 基于模板生成 Prompt 内容
       parameters:
-      - description: 生成提示词请求
+      - description: 生成请求
         in: body
-        name: request
+        name: body
         required: true
         schema:
           $ref: '#/definitions/models.GenerateAIRequest'
@@ -590,12 +717,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 动态生成提示词
+      security:
+      - BearerAuth: []
+      summary: 生成 Prompt
       tags:
-      - 提示词模版
-  /prompt-templates/tag:
+      - 提示词模板
+  /api/prompt-templates/tag:
     get:
-      description: 根据标签获取提示词模版列表
+      description: 根据 tag 查询提示词模板
       parameters:
       - description: 标签
         in: query
@@ -613,12 +742,12 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 根据标签获取提示词模版
+      summary: 按标签获取提示词模板
       tags:
-      - 提示词模版
-  /schedules:
+      - 提示词模板
+  /api/schedules:
     get:
-      description: 获取所有定时任务配置列表
+      description: 获取当前可见的定时任务配置列表
       produces:
       - application/json
       responses:
@@ -630,7 +759,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 获取所有定时任务配置
+      summary: 获取定时任务列表
       tags:
       - 定时任务
     post:
@@ -640,7 +769,7 @@ paths:
       parameters:
       - description: 定时任务配置
         in: body
-        name: config
+        name: body
         required: true
         schema:
           $ref: '#/definitions/models.ScheduleConfig'
@@ -659,12 +788,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 创建定时任务配置
+      security:
+      - BearerAuth: []
+      summary: 创建定时任务
       tags:
       - 定时任务
-  /schedules/{id}:
+  /api/schedules/{id}:
     delete:
-      description: 根据ID删除定时任务配置
+      description: 根据 ID 删除定时任务配置
       parameters:
       - description: 定时任务ID
         in: path
@@ -682,12 +813,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 删除定时任务配置
+      security:
+      - BearerAuth: []
+      summary: 删除定时任务
       tags:
       - 定时任务
-  /schedules/{id}/logs:
+  /api/schedules/{id}/logs:
     get:
-      description: 根据定时任务ID获取执行记录列表
+      description: 根据任务 ID 获取执行日志
       parameters:
       - description: 定时任务ID
         in: path
@@ -705,26 +838,20 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 获取任务执行日志
+      summary: 获取定时任务日志
       tags:
       - 定时任务
-  /schedules/{id}/status:
+  /api/schedules/{id}/status:
     put:
       consumes:
       - application/json
-      description: 更新定时任务的状态（active/paused）
+      description: 将定时任务切换为 active 或 paused
       parameters:
       - description: 定时任务ID
         in: path
         name: id
         required: true
         type: string
-      - description: 状态 (active/paused)
-        in: body
-        name: status
-        required: true
-        schema:
-          type: string
       produces:
       - application/json
       responses:
@@ -740,42 +867,62 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 更新任务状态
+      security:
+      - BearerAuth: []
+      summary: 更新定时任务状态
       tags:
       - 定时任务
-  /system-config:
-    get:
-      consumes:
-      - application/json
-      description: 获取全局系统配置（包括标题、Logo、动态参数等）
+  /api/schedules/{id}/trigger:
+    post:
+      description: 立即执行指定定时任务
+      parameters:
+      - description: 定时任务ID
+        in: path
+        name: id
+        required: true
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            allOf:
-            - $ref: '#/definitions/models.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/models.SystemConfig'
-              type: object
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 手动触发定时任务
+      tags:
+      - 定时任务
+  /api/system-config:
+    get:
+      description: 获取当前系统配置
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
       summary: 获取系统配置
       tags:
-      - system-config
-  /system-config/basic:
+      - 系统配置
+  /api/system-config/basic:
     put:
       consumes:
       - application/json
-      description: 更新全局系统标题和Logo
+      description: 保存系统标题与 Logo 等基础配置
       parameters:
-      - description: 系统基础配置
+      - description: 基础配置
         in: body
-        name: config
+        name: body
         required: true
         schema:
           $ref: '#/definitions/models.SaveSystemBasicConfigRequest'
@@ -794,18 +941,20 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 保存系统基础配置
+      security:
+      - BearerAuth: []
+      summary: 保存基础系统配置
       tags:
-      - system-config
-  /system-config/parameters:
+      - 系统配置
+  /api/system-config/parameters:
     put:
       consumes:
       - application/json
-      description: 更新全局动态参数配置
+      description: 保存系统动态参数字典
       parameters:
-      - description: 系统动态参数配置
+      - description: 动态参数配置
         in: body
-        name: config
+        name: body
         required: true
         schema:
           $ref: '#/definitions/models.SaveSystemParametersRequest'
@@ -824,7 +973,54 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/models.Response'
-      summary: 保存系统动态参数
+      security:
+      - BearerAuth: []
+      summary: 保存动态参数配置
       tags:
-      - system-config
+      - 系统配置
+  /api/system-config/runtime:
+    put:
+      consumes:
+      - application/json
+      description: 保存 param1 与 param2 运行时配置
+      parameters:
+      - description: 运行时参数配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.SaveSystemRuntimeConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 保存运行时参数配置
+      tags:
+      - 系统配置
+  /health:
+    get:
+      description: 返回服务健康状态
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 健康检查
+      tags:
+      - 系统
 swagger: "2.0"

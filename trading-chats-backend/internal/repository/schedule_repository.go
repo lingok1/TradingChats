@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"trading-chats-backend/internal/models"
 	"trading-chats-backend/pkg/utils"
 
@@ -22,14 +23,18 @@ func NewScheduleRepository(db *mongo.Database) *ScheduleRepository {
 	}
 }
 
-// CreateConfig 创建定时任务配置
 func (r *ScheduleRepository) CreateConfig(ctx context.Context, config *models.ScheduleConfig) error {
+	authCtx := models.GetAuthContext(ctx)
+	tenantID := models.ResolveTenantID(authCtx, config.TenantID)
+	if tenantID == "" {
+		return errors.New("tenant_id is required")
+	}
+	config.TenantID = tenantID
 	config.CreatedAt = utils.NowString()
 	config.UpdatedAt = utils.NowString()
 	if config.Status == "" {
-		config.Status = "active" // 默认启用
+		config.Status = "active"
 	}
-
 	result, err := r.configCollection.InsertOne(ctx, config)
 	if err != nil {
 		return err
@@ -38,29 +43,28 @@ func (r *ScheduleRepository) CreateConfig(ctx context.Context, config *models.Sc
 	return nil
 }
 
-// GetConfigByID 根据ID获取定时任务配置
 func (r *ScheduleRepository) GetConfigByID(ctx context.Context, id string) (*models.ScheduleConfig, error) {
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-
+	filter := bson.M{"_id": objID}
+	applyTenantFilter(ctx, filter)
 	var config models.ScheduleConfig
-	err = r.configCollection.FindOne(ctx, bson.M{"_id": objID}).Decode(&config)
-	if err != nil {
+	if err := r.configCollection.FindOne(ctx, filter).Decode(&config); err != nil {
 		return nil, err
 	}
 	return &config, nil
 }
 
-// GetAllConfigs 获取所有定时任务配置
 func (r *ScheduleRepository) GetAllConfigs(ctx context.Context) ([]models.ScheduleConfig, error) {
-	cursor, err := r.configCollection.Find(ctx, bson.M{})
+	filter := bson.M{}
+	applyTenantFilter(ctx, filter)
+	cursor, err := r.configCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
-
 	var configs []models.ScheduleConfig
 	if err := cursor.All(ctx, &configs); err != nil {
 		return nil, err
@@ -68,14 +72,14 @@ func (r *ScheduleRepository) GetAllConfigs(ctx context.Context) ([]models.Schedu
 	return configs, nil
 }
 
-// GetActiveConfigs 获取所有处于启用状态的配置
 func (r *ScheduleRepository) GetActiveConfigs(ctx context.Context) ([]models.ScheduleConfig, error) {
-	cursor, err := r.configCollection.Find(ctx, bson.M{"status": "active"})
+	filter := bson.M{"status": "active"}
+	applyTenantFilter(ctx, filter)
+	cursor, err := r.configCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
-
 	var configs []models.ScheduleConfig
 	if err := cursor.All(ctx, &configs); err != nil {
 		return nil, err
@@ -83,33 +87,34 @@ func (r *ScheduleRepository) GetActiveConfigs(ctx context.Context) ([]models.Sch
 	return configs, nil
 }
 
-// UpdateConfig 更新定时任务配置
 func (r *ScheduleRepository) UpdateConfig(ctx context.Context, id string, updateData map[string]interface{}) error {
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return err
 	}
-
 	updateData["updated_at"] = utils.NowString()
-	update := bson.M{"$set": updateData}
-
-	_, err = r.configCollection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	filter := bson.M{"_id": objID}
+	applyTenantFilter(ctx, filter)
+	_, err = r.configCollection.UpdateOne(ctx, filter, bson.M{"$set": updateData})
 	return err
 }
 
-// DeleteConfig 删除定时任务配置
 func (r *ScheduleRepository) DeleteConfig(ctx context.Context, id string) error {
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return err
 	}
-
-	_, err = r.configCollection.DeleteOne(ctx, bson.M{"_id": objID})
+	filter := bson.M{"_id": objID}
+	applyTenantFilter(ctx, filter)
+	_, err = r.configCollection.DeleteOne(ctx, filter)
 	return err
 }
 
-// CreateLog 创建定时任务执行记录
 func (r *ScheduleRepository) CreateLog(ctx context.Context, log *models.ScheduleLog) error {
+	authCtx := models.GetAuthContext(ctx)
+	if log.TenantID == "" && authCtx != nil {
+		log.TenantID = authCtx.TenantID
+	}
 	log.ExecutedAt = utils.NowString()
 	result, err := r.logCollection.InsertOne(ctx, log)
 	if err != nil {
@@ -119,19 +124,18 @@ func (r *ScheduleRepository) CreateLog(ctx context.Context, log *models.Schedule
 	return nil
 }
 
-// GetLogsByConfigID 根据配置ID获取执行记录
 func (r *ScheduleRepository) GetLogsByConfigID(ctx context.Context, configID string) ([]models.ScheduleLog, error) {
 	objID, err := primitive.ObjectIDFromHex(configID)
 	if err != nil {
 		return nil, err
 	}
-
-	cursor, err := r.logCollection.Find(ctx, bson.M{"schedule_config_id": objID})
+	filter := bson.M{"schedule_config_id": objID}
+	applyTenantFilter(ctx, filter)
+	cursor, err := r.logCollection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
-
 	var logs []models.ScheduleLog
 	if err := cursor.All(ctx, &logs); err != nil {
 		return nil, err

@@ -34,6 +34,8 @@ func (r *systemConfigRepository) GetConfig(ctx context.Context) (*models.SystemC
 				ID:          models.GlobalSystemConfigID,
 				SystemTitle: "Trading Chats",
 				SystemLogo:  "",
+				Param1:      "",
+				Param2:      "",
 				Parameters:  map[string]string{},
 				UpdatedAt:   time.Now(),
 			}, nil
@@ -60,6 +62,8 @@ func (r *systemConfigRepository) SaveConfig(ctx context.Context, config *models.
 		ID:          config.ID,
 		SystemTitle: config.SystemTitle,
 		SystemLogo:  config.SystemLogo,
+		Param1:      config.Param1,
+		Param2:      config.Param2,
 		Parameters:  cloneParameters(config.Parameters),
 		UpdatedAt:   config.UpdatedAt,
 	}

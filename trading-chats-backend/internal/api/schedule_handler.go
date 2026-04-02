@@ -14,22 +14,21 @@ type ScheduleHandler struct {
 }
 
 func NewScheduleHandler(service *service.ScheduleService) *ScheduleHandler {
-	return &ScheduleHandler{
-		service: service,
-	}
+	return &ScheduleHandler{service: service}
 }
 
-// CreateConfig 创建定时任务配置
-// @Summary 创建定时任务配置
+// CreateConfig 创建定时任务
+// @Summary 创建定时任务
 // @Description 创建新的定时任务配置
 // @Tags 定时任务
 // @Accept json
 // @Produce json
-// @Param config body models.ScheduleConfig true "定时任务配置"
+// @Security BearerAuth
+// @Param body body models.ScheduleConfig true "定时任务配置"
 // @Success 200 {object} models.Response
 // @Failure 400 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /schedules [post]
+// @Router /api/schedules [post]
 func (h *ScheduleHandler) CreateConfig(c *gin.Context) {
 	var config models.ScheduleConfig
 	if err := c.ShouldBindJSON(&config); err != nil {
@@ -45,14 +44,14 @@ func (h *ScheduleHandler) CreateConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(config))
 }
 
-// GetConfigs 获取所有定时任务配置
-// @Summary 获取所有定时任务配置
-// @Description 获取所有定时任务配置列表
+// GetConfigs 获取定时任务列表
+// @Summary 获取定时任务列表
+// @Description 获取当前可见的定时任务配置列表
 // @Tags 定时任务
 // @Produce json
 // @Success 200 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /schedules [get]
+// @Router /api/schedules [get]
 func (h *ScheduleHandler) GetConfigs(c *gin.Context) {
 	configs, err := h.service.GetConfigs(c.Request.Context())
 	if err != nil {
@@ -63,18 +62,18 @@ func (h *ScheduleHandler) GetConfigs(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(configs))
 }
 
-// UpdateConfigStatus 更新任务状态 (暂停/恢复)
-// @Summary 更新任务状态
-// @Description 更新定时任务的状态（active/paused）
+// UpdateConfigStatus 更新定时任务状态
+// @Summary 更新定时任务状态
+// @Description 将定时任务切换为 active 或 paused
 // @Tags 定时任务
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param id path string true "定时任务ID"
-// @Param status body string true "状态 (active/paused)"
 // @Success 200 {object} models.Response
 // @Failure 400 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /schedules/{id}/status [put]
+// @Router /api/schedules/{id}/status [put]
 func (h *ScheduleHandler) UpdateConfigStatus(c *gin.Context) {
 	id := c.Param("id")
 
@@ -94,15 +93,16 @@ func (h *ScheduleHandler) UpdateConfigStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse("status updated successfully"))
 }
 
-// DeleteConfig 删除定时任务配置
-// @Summary 删除定时任务配置
-// @Description 根据ID删除定时任务配置
+// DeleteConfig 删除定时任务
+// @Summary 删除定时任务
+// @Description 根据 ID 删除定时任务配置
 // @Tags 定时任务
 // @Produce json
+// @Security BearerAuth
 // @Param id path string true "定时任务ID"
 // @Success 200 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /schedules/{id} [delete]
+// @Router /api/schedules/{id} [delete]
 func (h *ScheduleHandler) DeleteConfig(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.service.DeleteConfig(c.Request.Context(), id); err != nil {
@@ -113,15 +113,15 @@ func (h *ScheduleHandler) DeleteConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse("deleted successfully"))
 }
 
-// GetLogsByConfigID 获取某个任务的执行日志
-// @Summary 获取任务执行日志
-// @Description 根据定时任务ID获取执行记录列表
+// GetLogsByConfigID 获取定时任务日志
+// @Summary 获取定时任务日志
+// @Description 根据任务 ID 获取执行日志
 // @Tags 定时任务
 // @Produce json
 // @Param id path string true "定时任务ID"
 // @Success 200 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /schedules/{id}/logs [get]
+// @Router /api/schedules/{id}/logs [get]
 func (h *ScheduleHandler) GetLogsByConfigID(c *gin.Context) {
 	id := c.Param("id")
 	logs, err := h.service.GetLogsByConfigID(c.Request.Context(), id)
@@ -131,4 +131,24 @@ func (h *ScheduleHandler) GetLogsByConfigID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(logs))
+}
+
+// TriggerNow 手动触发定时任务
+// @Summary 手动触发定时任务
+// @Description 立即执行指定定时任务
+// @Tags 定时任务
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "定时任务ID"
+// @Success 200 {object} models.Response
+// @Failure 500 {object} models.Response
+// @Router /api/schedules/{id}/trigger [post]
+func (h *ScheduleHandler) TriggerNow(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.service.TriggerNow(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse("triggered successfully"))
 }

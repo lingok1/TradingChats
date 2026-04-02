@@ -24,11 +24,12 @@ func NewModelAPIHandler(service *service.ModelAPIService) *ModelAPIHandler {
 // @Tags 模型与API配置
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param config body models.ModelAPIConfig true "模型与API配置信息"
 // @Success 201 {object} models.Response
 // @Failure 400 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /model-api-configs [post]
+// @Router /api/model-api-configs [post]
 func (h *ModelAPIHandler) CreateModelAPIConfig(c *gin.Context) {
 	var config models.ModelAPIConfig
 	if err := c.ShouldBindJSON(&config); err != nil {
@@ -54,7 +55,7 @@ func (h *ModelAPIHandler) CreateModelAPIConfig(c *gin.Context) {
 // @Failure 400 {object} models.Response
 // @Failure 404 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /model-api-configs/{id} [get]
+// @Router /api/model-api-configs/{id} [get]
 func (h *ModelAPIHandler) GetModelAPIConfigByID(c *gin.Context) {
 	id := c.Param("id")
 	config, err := h.service.GetModelAPIConfigByID(c.Request.Context(), id)
@@ -73,7 +74,7 @@ func (h *ModelAPIHandler) GetModelAPIConfigByID(c *gin.Context) {
 // @Produce json
 // @Success 200 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /model-api-configs [get]
+// @Router /api/model-api-configs [get]
 func (h *ModelAPIHandler) GetAllModelAPIConfigs(c *gin.Context) {
 	configs, err := h.service.GetAllModelAPIConfigs(c.Request.Context())
 	if err != nil {
@@ -92,7 +93,7 @@ func (h *ModelAPIHandler) GetAllModelAPIConfigs(c *gin.Context) {
 // @Param provider query string true "提供商"
 // @Success 200 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /model-api-configs/provider [get]
+// @Router /api/model-api-configs/provider [get]
 func (h *ModelAPIHandler) GetModelAPIConfigsByProvider(c *gin.Context) {
 	provider := c.Query("provider")
 	configs, err := h.service.GetModelAPIConfigsByProvider(c.Request.Context(), provider)
@@ -110,12 +111,13 @@ func (h *ModelAPIHandler) GetModelAPIConfigsByProvider(c *gin.Context) {
 // @Tags 模型与API配置
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param id path string true "模型与API配置ID"
 // @Param config body models.ModelAPIConfig true "模型与API配置信息"
 // @Success 200 {object} models.Response
 // @Failure 400 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /model-api-configs/{id} [put]
+// @Router /api/model-api-configs/{id} [put]
 func (h *ModelAPIHandler) UpdateModelAPIConfig(c *gin.Context) {
 	id := c.Param("id")
 	var config models.ModelAPIConfig
@@ -138,11 +140,12 @@ func (h *ModelAPIHandler) UpdateModelAPIConfig(c *gin.Context) {
 // @Description 删除模型与API配置
 // @Tags 模型与API配置
 // @Produce json
+// @Security BearerAuth
 // @Param id path string true "模型与API配置ID"
 // @Success 200 {object} models.Response
 // @Failure 400 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /model-api-configs/{id} [delete]
+// @Router /api/model-api-configs/{id} [delete]
 func (h *ModelAPIHandler) DeleteModelAPIConfig(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.service.DeleteModelAPIConfig(c.Request.Context(), id); err != nil {
@@ -158,16 +161,18 @@ func (h *ModelAPIHandler) DeleteModelAPIConfig(c *gin.Context) {
 // @Description 测试模型与API的连通性
 // @Tags 模型与API配置
 // @Produce json
+// @Security BearerAuth
 // @Param id path string true "模型与API配置ID"
 // @Success 200 {object} models.Response
 // @Failure 400 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /model-api-configs/{id}/test [post]
+// @Router /api/model-api-configs/{id}/test [post]
 func (h *ModelAPIHandler) TestModelConnectivity(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.service.TestModelConnectivity(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
-		return
+	
+	return
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "Model connectivity test passed"}))

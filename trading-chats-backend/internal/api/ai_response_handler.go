@@ -14,22 +14,18 @@ type AIResponseHandler struct {
 }
 
 func NewAIResponseHandler(service *service.AIResponseService) *AIResponseHandler {
-	return &AIResponseHandler{
-		service: service,
-	}
+	return &AIResponseHandler{service: service}
 }
 
-// GetAIResponseByID 根据ID获取AI响应信息
-// @Summary 根据ID获取AI响应信息
-// @Description 根据ID获取AI响应信息详情
-// @Tags AI响应信息
+// GetAIResponseByID 获取 AI 响应详情
+// @Summary 获取 AI 响应详情
+// @Description 根据 ID 获取 AI 响应详情
+// @Tags AI响应
 // @Produce json
-// @Param id path string true "AI响应信息ID"
+// @Param id path string true "AI 响应ID"
 // @Success 200 {object} models.Response
-// @Failure 400 {object} models.Response
-// @Failure 404 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /ai-responses/{id} [get]
+// @Router /api/ai-responses/{id} [get]
 func (h *AIResponseHandler) GetAIResponseByID(c *gin.Context) {
 	id := c.Param("id")
 	response, err := h.service.GetAIResponseByID(c.Request.Context(), id)
@@ -41,15 +37,15 @@ func (h *AIResponseHandler) GetAIResponseByID(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(response))
 }
 
-// GetAIResponsesByBatchID 根据批次ID获取AI响应信息
-// @Summary 根据批次ID获取AI响应信息
-// @Description 根据批次ID获取AI响应信息列表
-// @Tags AI响应信息
+// GetAIResponsesByBatchID 按批次获取 AI 响应
+// @Summary 按批次获取 AI 响应
+// @Description 根据 batch_id 获取 AI 响应列表
+// @Tags AI响应
 // @Produce json
 // @Param batch_id query string true "批次ID"
 // @Success 200 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /ai-responses/batch [get]
+// @Router /api/ai-responses/batch [get]
 func (h *AIResponseHandler) GetAIResponsesByBatchID(c *gin.Context) {
 	batchID := c.Query("batch_id")
 	responses, err := h.service.GetAIResponsesByBatchID(c.Request.Context(), batchID)
@@ -61,15 +57,14 @@ func (h *AIResponseHandler) GetAIResponsesByBatchID(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(responses))
 }
 
-// GetLatestSuccessfulBatch 获取最近一次成功的批次数据
-// @Summary 获取最近一次成功的批次数据
-// @Description 获取最近一次状态为 completed 的完整批次 AI 响应列表
-// @Tags AI响应信息
+// GetLatestSuccessfulBatch 获取最近成功批次
+// @Summary 获取最近成功批次
+// @Description 获取最近成功生成的 AI 响应批次
+// @Tags AI响应
 // @Produce json
 // @Success 200 {object} models.Response
 // @Failure 404 {object} models.Response
-// @Failure 500 {object} models.Response
-// @Router /ai-responses/latest [get]
+// @Router /api/ai-responses/latest [get]
 func (h *AIResponseHandler) GetLatestSuccessfulBatch(c *gin.Context) {
 	responses, err := h.service.GetLatestSuccessfulBatch(c.Request.Context())
 	if err != nil {
@@ -80,14 +75,14 @@ func (h *AIResponseHandler) GetLatestSuccessfulBatch(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(responses))
 }
 
-// GetAllAIResponses 获取所有AI响应信息
-// @Summary 获取所有AI响应信息
-// @Description 获取所有AI响应信息列表
-// @Tags AI响应信息
+// GetAllAIResponses 获取 AI 响应列表
+// @Summary 获取 AI 响应列表
+// @Description 获取当前可见的 AI 响应列表
+// @Tags AI响应
 // @Produce json
 // @Success 200 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /ai-responses [get]
+// @Router /api/ai-responses [get]
 func (h *AIResponseHandler) GetAllAIResponses(c *gin.Context) {
 	responses, err := h.service.GetAllAIResponses(c.Request.Context())
 	if err != nil {
@@ -98,17 +93,18 @@ func (h *AIResponseHandler) GetAllAIResponses(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(responses))
 }
 
-// GenerateBatchAIResponses 生成批次AI响应
-// @Summary 生成批次AI响应
-// @Description 根据提示词模版和参数生成批次AI响应
-// @Tags AI响应信息
+// GenerateBatchAIResponses 生成 AI 响应
+// @Summary 生成 AI 响应
+// @Description 根据模板生成一批 AI 响应
+// @Tags AI响应
 // @Accept json
 // @Produce json
-// @Param request body models.GenerateAIRequest true "生成批次AI响应请求"
+// @Security BearerAuth
+// @Param body body models.GenerateAIRequest true "生成请求"
 // @Success 200 {object} models.Response
 // @Failure 400 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /ai-responses/generate [post]
+// @Router /api/ai-responses/generate [post]
 func (h *AIResponseHandler) GenerateBatchAIResponses(c *gin.Context) {
 	var req models.GenerateAIRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -121,7 +117,7 @@ func (h *AIResponseHandler) GenerateBatchAIResponses(c *gin.Context) {
 		return
 	}
 
-	batchID, err := h.service.GenerateBatchAIResponses(c.Request.Context(), req.TemplateID, req.Param1, req.Param2)
+	batchID, _, err := h.service.GenerateBatchAIResponses(c.Request.Context(), req.TemplateID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
 		return

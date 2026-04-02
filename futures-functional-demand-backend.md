@@ -11,11 +11,11 @@
  
  Redis 连接（示例）：
  
- redis-cli -h 122.51.4.80 -p 6379 -a redis123
+redis-cli -h 150.158.18.92 -p 6379 -a redis123
  
  MongoDB 连接（示例）：
  
- mongodb://admin:mongo123@122.51.4.80:27017
+mongodb://admin:mongo123@150.158.18.92:27017
  
  ## 业务需求
  

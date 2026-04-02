@@ -17,7 +17,6 @@ type Config struct {
 
 type ServerConfig struct {
 	Port string
-	Env  string
 }
 
 type MongoDBConfig struct {
@@ -41,41 +40,39 @@ type APIConfig struct {
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
-	jwtExpiration, err := time.ParseDuration(getEnv("JWT_EXPIRATION", "24h"))
-	if err != nil {
-		jwtExpiration = 24 * time.Hour
-	}
-
-	apiTimeout, err := time.ParseDuration(getEnv("API_TIMEOUT", "30s"))
-	if err != nil {
-		apiTimeout = 30 * time.Second
-	}
-
 	return &Config{
 		Server: ServerConfig{
 			Port: getEnv("PORT", "8080"),
-			Env:  getEnv("ENV", "development"),
 		},
 		MongoDB: MongoDBConfig{
-			URI:      getEnv("MONGODB_URI", "mongodb://admin:mongo123@150.158.18.92:27017"),
+			URI:      getEnv("MONGODB_URI", "mongodb://localhost:27017"),
 			Database: getEnv("MONGODB_DATABASE", "trading_chats"),
 		},
 		Redis: RedisConfig{
-			URI: getEnv("REDIS_URI", "redis://:redis123@150.158.18.92:6379/0"),
+			URI: getEnv("REDIS_URI", "redis://localhost:6379/0"),
 		},
 		JWT: JWTConfig{
-			Secret:     getEnv("JWT_SECRET", "your_jwt_secret_key"),
-			Expiration: jwtExpiration,
+			Secret:     getEnv("JWT_SECRET", "change_me_in_production"),
+			Expiration: getDurationEnv("JWT_EXPIRATION", 24*time.Hour),
 		},
 		API: APIConfig{
-			Timeout: apiTimeout,
+			Timeout: getDurationEnv("API_TIMEOUT", 60*time.Second),
 		},
 	}, nil
 }
 
 func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
+	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if duration, err := time.ParseDuration(value); err == nil {
+			return duration
+		}
 	}
 	return defaultValue
 }
