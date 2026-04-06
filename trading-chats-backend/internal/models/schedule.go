@@ -26,3 +26,8 @@ type ScheduleLog struct {
 	Error            string             `bson:"error" json:"error"`
 	ExecutedAt       interface{}        `bson:"executed_at" json:"executed_at"`
 }
+
+type UpdateStatusRequest struct {
+	ID     string `json:"id" binding:"required"`
+	Status string `json:"status" binding:"required,oneof=active paused"`
+}

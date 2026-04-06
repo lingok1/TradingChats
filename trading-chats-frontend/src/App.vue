@@ -1,7 +1,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Refresh, Setting, Moon, Sunny, HomeFilled, DataAnalysis, Goods, Position, Notification } from '@element-plus/icons-vue'
+import { Setting, Moon, Sunny, HomeFilled, DataAnalysis, Goods, Position, Notification, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { AIResponse } from './api/types'
 import { getSystemConfig } from './api/systemConfig'
@@ -293,7 +293,7 @@ onMounted(() => {
       </div>
 
       <div class="tc-header-right">
-        <el-button circle @click="loadLatest" :loading="loading" title="刷新">
+        <el-button circle @click="loadLatest" :loading="loading" title="刷新数据">
           <el-icon><Refresh /></el-icon>
         </el-button>
         <el-button circle @click="mode = mode === 'dark' ? 'light' : 'dark'" :title="mode === 'dark' ? '浅色模式' : '深色模式'">
@@ -521,4 +521,6 @@ onMounted(() => {
     padding: 12px;
   }
 }
+
+
 </style>

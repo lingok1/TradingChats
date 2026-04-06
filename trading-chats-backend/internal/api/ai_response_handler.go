@@ -117,7 +117,7 @@ func (h *AIResponseHandler) GenerateBatchAIResponses(c *gin.Context) {
 		return
 	}
 
-	batchID, _, err := h.service.GenerateBatchAIResponses(c.Request.Context(), req.TemplateID)
+	batchID, err := h.service.GenerateBatchAIResponses(c.Request.Context(), req.TemplateID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
 		return

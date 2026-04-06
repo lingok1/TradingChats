@@ -87,30 +87,3 @@ func (h *SystemConfigHandler) SaveParameters(c *gin.Context) {
 
 	c.JSON(http.StatusOK, models.SuccessResponse("ok"))
 }
-
-// SaveRuntimeConfig 保存运行时参数配置
-// @Summary 保存运行时参数配置
-// @Description 保存 param1 与 param2 运行时配置
-// @Tags 系统配置
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param body body models.SaveSystemRuntimeConfigRequest true "运行时参数配置"
-// @Success 200 {object} models.Response
-// @Failure 400 {object} models.Response
-// @Failure 500 {object} models.Response
-// @Router /api/system-config/runtime [put]
-func (h *SystemConfigHandler) SaveRuntimeConfig(c *gin.Context) {
-	var req models.SaveSystemRuntimeConfigRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse(400, err.Error()))
-		return
-	}
-
-	if err := h.service.SaveRuntimeConfig(c.Request.Context(), &req); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
-		return
-	}
-
-	c.JSON(http.StatusOK, models.SuccessResponse("ok"))
-}

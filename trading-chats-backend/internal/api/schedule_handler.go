@@ -69,23 +69,19 @@ func (h *ScheduleHandler) GetConfigs(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "定时任务ID"
+// @Param body body models.UpdateStatusRequest true "状态更新请求"
 // @Success 200 {object} models.Response
 // @Failure 400 {object} models.Response
 // @Failure 500 {object} models.Response
-// @Router /api/schedules/{id}/status [put]
+// @Router /api/schedules/status [put]
 func (h *ScheduleHandler) UpdateConfigStatus(c *gin.Context) {
-	id := c.Param("id")
-
-	var req struct {
-		Status string `json:"status" binding:"required"`
-	}
+	var req models.UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(400, err.Error()))
 		return
 	}
 
-	if err := h.service.UpdateConfigStatus(c.Request.Context(), id, req.Status); err != nil {
+	if err := h.service.UpdateConfigStatus(c.Request.Context(), req.ID, req.Status); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
 		return
 	}

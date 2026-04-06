@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"time"
 	"trading-chats-backend/internal/db"
 	"trading-chats-backend/internal/models"
@@ -17,7 +16,6 @@ type SystemConfigService interface {
 	GetConfig(ctx context.Context) (*models.SystemConfig, error)
 	SaveBasicConfig(ctx context.Context, input *models.SaveSystemBasicConfigRequest) error
 	SaveParameters(ctx context.Context, input *models.SaveSystemParametersRequest) error
-	SaveRuntimeConfig(ctx context.Context, input *models.SaveSystemRuntimeConfigRequest) error
 }
 
 type systemConfigService struct {
@@ -88,29 +86,6 @@ func (s *systemConfigService) SaveParameters(ctx context.Context, input *models.
 	return nil
 }
 
-func (s *systemConfigService) SaveRuntimeConfig(ctx context.Context, input *models.SaveSystemRuntimeConfigRequest) error {
-	if input == nil {
-		input = &models.SaveSystemRuntimeConfigRequest{}
-	}
-
-	current, err := s.repo.GetConfig(ctx)
-	if err != nil {
-		return err
-	}
-
-	next := normalizeSystemConfig(current)
-	next.Param1 = normalizeRuntimeValue(input.Param1)
-	next.Param2 = normalizeRuntimeValue(input.Param2)
-	next.UpdatedAt = time.Now()
-
-	if err := s.repo.SaveConfig(ctx, next); err != nil {
-		return err
-	}
-
-	s.invalidateCache(ctx)
-	return nil
-}
-
 func (s *systemConfigService) getCachedConfig(ctx context.Context) (*models.SystemConfig, bool) {
 	if db.RedisClient == nil {
 		return nil, false
@@ -156,8 +131,6 @@ func normalizeSystemConfig(config *models.SystemConfig) *models.SystemConfig {
 			ID:          models.GlobalSystemConfigID,
 			SystemTitle: "Trading Chats",
 			SystemLogo:  "",
-			Param1:      "",
-			Param2:      "",
 			Parameters:  map[string]string{},
 			UpdatedAt:   time.Now(),
 		}
@@ -167,8 +140,6 @@ func normalizeSystemConfig(config *models.SystemConfig) *models.SystemConfig {
 		ID:          config.ID,
 		SystemTitle: config.SystemTitle,
 		SystemLogo:  config.SystemLogo,
-		Param1:      normalizeRuntimeValue(config.Param1),
-		Param2:      normalizeRuntimeValue(config.Param2),
 		Parameters:  cloneParameters(config.Parameters),
 		UpdatedAt:   config.UpdatedAt,
 	}
@@ -193,8 +164,4 @@ func cloneParameters(source map[string]string) map[string]string {
 	}
 
 	return cloned
-}
-
-func normalizeRuntimeValue(value string) string {
-	return strings.TrimSpace(value)
 }

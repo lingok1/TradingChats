@@ -16,6 +16,19 @@ definitions:
     - password
     - username
     type: object
+  models.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_at:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+    type: object
   models.LogoutRequest:
     properties:
       refresh_token:
@@ -105,6 +118,14 @@ definitions:
       msg:
         type: string
     type: object
+  models.Role:
+    enum:
+    - admin
+    - tenant
+    type: string
+    x-enum-varnames:
+    - RoleAdmin
+    - RoleTenant
   models.SaveSystemBasicConfigRequest:
     properties:
       system_logo:
@@ -118,13 +139,6 @@ definitions:
         additionalProperties:
           type: string
         type: object
-    type: object
-  models.SaveSystemRuntimeConfigRequest:
-    properties:
-      param1:
-        type: string
-      param2:
-        type: string
     type: object
   models.ScheduleConfig:
     properties:
@@ -142,6 +156,37 @@ definitions:
       tenant_id:
         type: string
       updated_at: {}
+    type: object
+  models.UpdateStatusRequest:
+    properties:
+      id:
+        type: string
+      status:
+        enum:
+        - active
+        - paused
+        type: string
+    required:
+    - id
+    - status
+    type: object
+  models.User:
+    properties:
+      created_at: {}
+      display_name:
+        type: string
+      id:
+        type: string
+      last_login_at: {}
+      role:
+        $ref: '#/definitions/models.Role'
+      status:
+        type: string
+      tenant_id:
+        type: string
+      updated_at: {}
+      username:
+        type: string
     type: object
 host: localhost:8080
 info:
@@ -266,7 +311,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 使用用户名与密码获取访问令牌
+      description: '使用用户名与密码获取访问令牌，返回的 access_token 用于后续请求的 Authorization Header (格式:
+        Bearer <token>)'
       parameters:
       - description: 登录请求
         in: body
@@ -280,7 +326,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Response'
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoginResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -352,7 +403,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 创建租户与租户管理员账号，并直接返回登录令牌
+      description: '创建租户与租户管理员账号，并直接返回登录令牌 (access_token 用于后续请求的 Authorization Header，格式:
+        Bearer <token>)'
       parameters:
       - description: 注册请求
         in: body
@@ -366,7 +418,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Response'
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoginResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -877,37 +934,6 @@ paths:
       summary: 获取定时任务日志
       tags:
       - 定时任务
-  /api/schedules/{id}/status:
-    put:
-      consumes:
-      - application/json
-      description: 将定时任务切换为 active 或 paused
-      parameters:
-      - description: 定时任务ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.Response'
-      security:
-      - BearerAuth: []
-      summary: 更新定时任务状态
-      tags:
-      - 定时任务
   /api/schedules/{id}/trigger:
     post:
       description: 立即执行指定定时任务
@@ -931,6 +957,38 @@ paths:
       security:
       - BearerAuth: []
       summary: 手动触发定时任务
+      tags:
+      - 定时任务
+  /api/schedules/status:
+    put:
+      consumes:
+      - application/json
+      description: 将定时任务切换为 active 或 paused
+      parameters:
+      - description: 状态更新请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 更新定时任务状态
       tags:
       - 定时任务
   /api/system-config:
@@ -1014,38 +1072,6 @@ paths:
       summary: 保存动态参数配置
       tags:
       - 系统配置
-  /api/system-config/runtime:
-    put:
-      consumes:
-      - application/json
-      description: 保存 param1 与 param2 运行时配置
-      parameters:
-      - description: 运行时参数配置
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.SaveSystemRuntimeConfigRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.Response'
-      security:
-      - BearerAuth: []
-      summary: 保存运行时参数配置
-      tags:
-      - 系统配置
   /health:
     get:
       description: 返回服务健康状态
@@ -1059,4 +1085,10 @@ paths:
       summary: 健康检查
       tags:
       - 系统
+securityDefinitions:
+  BearerAuth:
+    description: '请输入 JWT Token，格式为: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

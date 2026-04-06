@@ -20,20 +20,22 @@ const (
 )
 
 type ScheduleService struct {
-	repo              *repository.ScheduleRepository
-	aiResponseService *AIResponseService
-	cronEngine        *cron.Cron
-	taskMap           map[string]cron.EntryID
-	mutex             sync.RWMutex
+	repo                  *repository.ScheduleRepository
+	aiResponseService     *AIResponseService
+	promptTemplateService *PromptTemplateService
+	cronEngine            *cron.Cron
+	taskMap               map[string]cron.EntryID
+	mutex                 sync.RWMutex
 }
 
-func NewScheduleService(repo *repository.ScheduleRepository, aiResponseService *AIResponseService) *ScheduleService {
+func NewScheduleService(repo *repository.ScheduleRepository, aiResponseService *AIResponseService, promptTemplateService *PromptTemplateService) *ScheduleService {
 	c := cron.New(cron.WithSeconds())
 	return &ScheduleService{
-		repo:              repo,
-		aiResponseService: aiResponseService,
-		cronEngine:        c,
-		taskMap:           make(map[string]cron.EntryID),
+		repo:                  repo,
+		aiResponseService:     aiResponseService,
+		promptTemplateService: promptTemplateService,
+		cronEngine:            c,
+		taskMap:               make(map[string]cron.EntryID),
 	}
 }
 
@@ -87,7 +89,26 @@ func (s *ScheduleService) executeTask(ctx context.Context, config models.Schedul
 	taskCtx, cancel := context.WithTimeout(ctx, 8*time.Minute)
 	defer cancel()
 	log.Printf("Executing scheduled task: %s (TemplateID: %s, TriggerType: %s)\n", config.Name, config.TemplateID, triggerType)
-	batchID, prompt, err := s.aiResponseService.GenerateBatchAIResponses(taskCtx, config.TemplateID)
+
+	prompt, err := s.promptTemplateService.GeneratePrompt(taskCtx, config.TemplateID)
+	if err != nil {
+		log.Printf("Failed to generate prompt: %v\n", err)
+		logEntry := &models.ScheduleLog{
+			TenantID:         config.TenantID,
+			ScheduleConfigID: config.ID,
+			Prompt:           "",
+			TriggerType:      triggerType,
+			Status:           "failed",
+			Error:            err.Error(),
+			ExecutedAt:       utils.NowString(),
+		}
+		if err := s.repo.CreateLog(taskCtx, logEntry); err != nil {
+			log.Printf("Failed to save schedule log: %v\n", err)
+		}
+		return
+	}
+
+	batchID, err := s.aiResponseService.GenerateBatchAIResponses(taskCtx, config.TemplateID)
 	logEntry := &models.ScheduleLog{
 		TenantID:         config.TenantID,
 		ScheduleConfigID: config.ID,

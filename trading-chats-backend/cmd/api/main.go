@@ -10,9 +10,6 @@ import (
 	"trading-chats-backend/internal/service"
 
 	_ "trading-chats-backend/docs"
-
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // @title Trading Chats Backend API
@@ -20,6 +17,10 @@ import (
 // @description Trading Chats 后端服务接口文档
 // @host localhost:8080
 // @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description 请输入 JWT Token，格式为: Bearer <token>
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -42,7 +43,7 @@ func main() {
 	promptTemplateService := service.NewPromptTemplateService(promptTemplateRepo, systemConfigService)
 	modelAPIService := service.NewModelAPIService(modelAPIRepo)
 	aiResponseService := service.NewAIResponseService(aiResponseRepo, modelAPIService, promptTemplateService, systemConfigService)
-	scheduleService := service.NewScheduleService(scheduleRepo, aiResponseService)
+	scheduleService := service.NewScheduleService(scheduleRepo, aiResponseService, promptTemplateService)
 	authService := service.NewAuthService(authRepo, cfg.JWT)
 
 	if err := authService.EnsureBootstrapData(context.Background()); err != nil {
@@ -54,8 +55,7 @@ func main() {
 	}
 	defer scheduleService.Stop()
 
-	r := api.SetupRouter(promptTemplateService, modelAPIService, aiResponseService, scheduleService, systemConfigService, authService)
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	r := api.SetupRouter(promptTemplateService, modelAPIService, aiResponseService, scheduleService, systemConfigService, authService, &cfg.Swagger)
 
 	log.Printf("Server running at http://localhost:%s", cfg.Server.Port)
 	if err := r.Run(":" + cfg.Server.Port); err != nil {

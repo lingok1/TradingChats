@@ -18,12 +18,12 @@ func NewAuthHandler(service *service.AuthService) *AuthHandler {
 
 // Register 用户注册
 // @Summary 用户注册
-// @Description 创建租户与租户管理员账号，并直接返回登录令牌
+// @Description 创建租户与租户管理员账号，并直接返回登录令牌 (access_token 用于后续请求的 Authorization Header，格式: Bearer <token>)
 // @Tags 鉴权
 // @Accept json
 // @Produce json
 // @Param body body models.RegisterRequest true "注册请求"
-// @Success 200 {object} models.Response
+// @Success 200 {object} models.Response{data=models.LoginResponse}
 // @Failure 400 {object} models.Response
 // @Router /api/auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -44,12 +44,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 // Login 用户登录
 // @Summary 用户登录
-// @Description 使用用户名与密码获取访问令牌
+// @Description 使用用户名与密码获取访问令牌，返回的 access_token 用于后续请求的 Authorization Header (格式: Bearer <token>)
 // @Tags 鉴权
 // @Accept json
 // @Produce json
 // @Param body body models.LoginRequest true "登录请求"
-// @Success 200 {object} models.Response
+// @Success 200 {object} models.Response{data=models.LoginResponse}
 // @Failure 400 {object} models.Response
 // @Failure 401 {object} models.Response
 // @Router /api/auth/login [post]

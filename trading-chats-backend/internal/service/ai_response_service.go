@@ -81,26 +81,26 @@ func (s *AIResponseService) DeleteAIResponse(ctx context.Context, id string) err
 	return s.repo.Delete(ctx, objectID)
 }
 
-func (s *AIResponseService) GenerateBatchAIResponses(ctx context.Context, templateID string) (string, string, error) {
+func (s *AIResponseService) GenerateBatchAIResponses(ctx context.Context, templateID string) (string, error) {
 	batchID := uuid.New().String()
 
 	modelConfigs, err := s.modelAPIService.GetAllModelAPIConfigs(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get model API configs: %w", err)
+		return "", fmt.Errorf("failed to get model API configs: %w", err)
 	}
 
 	prompt, err := s.promptTemplateService.GeneratePrompt(ctx, templateID)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to generate prompt: %w", err)
+		return "", fmt.Errorf("failed to generate prompt: %w", err)
 	}
 
 	authCtx := models.GetAuthContext(ctx)
+
 	for _, config := range modelConfigs {
 		for _, modelName := range config.Models {
 			response := &models.AIResponse{
 				TenantID:  models.ResolveTenantID(authCtx, config.TenantID),
 				BatchID:   batchID,
-				Prompt:    prompt,
 				ModelName: modelName,
 				Provider:  config.Provider,
 				Status:    "pending",
@@ -110,16 +110,16 @@ func (s *AIResponseService) GenerateBatchAIResponses(ctx context.Context, templa
 				continue
 			}
 
-			go func(resp *models.AIResponse, cfg models.ModelAPIConfig, model string) {
-				s.callAIModel(context.Background(), resp, cfg, model)
-			}(response, config, modelName)
+			go func(resp *models.AIResponse, cfg models.ModelAPIConfig, model string, p string) {
+				s.callAIModel(context.Background(), resp, cfg, model, p)
+			}(response, config, modelName, prompt)
 		}
 	}
 
-	return batchID, prompt, nil
+	return batchID, nil
 }
 
-func (s *AIResponseService) callAIModel(ctx context.Context, response *models.AIResponse, config models.ModelAPIConfig, modelName string) {
+func (s *AIResponseService) callAIModel(ctx context.Context, response *models.AIResponse, config models.ModelAPIConfig, modelName string, prompt string) {
 	var req *http.Request
 	var errRequest error
 
@@ -129,7 +129,7 @@ func (s *AIResponseService) callAIModel(ctx context.Context, response *models.AI
 			"model": modelName,
 			"messages": []map[string]string{{
 				"role":    "user",
-				"content": response.Prompt,
+				"content": prompt,
 			}},
 			"max_tokens": defaultMaxTokens,
 		}
@@ -150,7 +150,7 @@ func (s *AIResponseService) callAIModel(ctx context.Context, response *models.AI
 			"model": modelName,
 			"messages": []map[string]string{{
 				"role":    "user",
-				"content": response.Prompt,
+				"content": prompt,
 			}},
 			"max_tokens": defaultMaxTokens,
 		}

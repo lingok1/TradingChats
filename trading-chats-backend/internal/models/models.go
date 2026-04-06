@@ -30,7 +30,6 @@ type AIResponse struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	TenantID    string             `bson:"tenant_id" json:"tenant_id"`
 	BatchID     string             `bson:"batch_id" json:"batch_id"`
-	Prompt      string             `bson:"prompt" json:"prompt"`
 	Response    string             `bson:"response" json:"response"`
 	ModelName   string             `bson:"model_name" json:"model_name"`
 	Provider    string             `bson:"provider" json:"provider"`

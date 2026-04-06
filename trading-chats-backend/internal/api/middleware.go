@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strings"
+	"trading-chats-backend/internal/config"
 	"trading-chats-backend/internal/models"
 	"trading-chats-backend/internal/service"
 
@@ -58,4 +59,25 @@ func MustGetAuthContext(c *gin.Context) *models.AuthContext {
 		return models.GetAuthContext(c.Request.Context())
 	}
 	return authCtx
+}
+
+func SwaggerBasicAuth(cfg *config.SwaggerConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if cfg.AllowWithoutAuth {
+			c.Next()
+			return
+		}
+
+		user, pass, ok := c.Request.BasicAuth()
+		if !ok || user != cfg.Username || pass != cfg.Password {
+			c.Header("WWW-Authenticate", `Basic realm="Swagger API Documentation"`)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"code":    401,
+				"message": "Unauthorized: Valid authentication credentials required for Swagger documentation",
+			})
+			return
+		}
+
+		c.Next()
+	}
 }

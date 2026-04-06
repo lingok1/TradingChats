@@ -20,7 +20,7 @@ const open = computed({
 const loading = ref(false)
 const form = reactive({
   username: 'admin',
-  password: 'Admin@123456',
+  password: '',
 })
 
 async function onSubmit() {

@@ -31,14 +31,12 @@ func (r *systemConfigRepository) GetConfig(ctx context.Context) (*models.SystemC
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return &models.SystemConfig{
-				ID:          models.GlobalSystemConfigID,
-				SystemTitle: "Trading Chats",
-				SystemLogo:  "",
-				Param1:      "",
-				Param2:      "",
-				Parameters:  map[string]string{},
-				UpdatedAt:   time.Now(),
-			}, nil
+			ID:          models.GlobalSystemConfigID,
+			SystemTitle: "Trading Chats",
+			SystemLogo:  "",
+			Parameters:  map[string]string{},
+			UpdatedAt:   time.Now(),
+		}, nil
 		}
 		return nil, err
 	}
@@ -62,8 +60,6 @@ func (r *systemConfigRepository) SaveConfig(ctx context.Context, config *models.
 		ID:          config.ID,
 		SystemTitle: config.SystemTitle,
 		SystemLogo:  config.SystemLogo,
-		Param1:      config.Param1,
-		Param2:      config.Param2,
 		Parameters:  cloneParameters(config.Parameters),
 		UpdatedAt:   config.UpdatedAt,
 	}

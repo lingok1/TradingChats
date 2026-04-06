@@ -13,6 +13,13 @@ type Config struct {
 	Redis   RedisConfig
 	JWT     JWTConfig
 	API     APIConfig
+	Swagger SwaggerConfig
+}
+
+type SwaggerConfig struct {
+	AllowWithoutAuth bool
+	Username         string
+	Password         string
 }
 
 type ServerConfig struct {
@@ -57,6 +64,11 @@ func Load() (*Config, error) {
 		},
 		API: APIConfig{
 			Timeout: getDurationEnv("API_TIMEOUT", 60*time.Second),
+		},
+		Swagger: SwaggerConfig{
+			AllowWithoutAuth: getEnv("SWAGGER_ALLOW_WITHOUT_AUTH", "true") == "true",
+			Username:         getEnv("SWAGGER_USERNAME", "admin"),
+			Password:         getEnv("SWAGGER_PASSWORD", "swagger123"),
 		},
 	}, nil
 }

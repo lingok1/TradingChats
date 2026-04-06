@@ -131,12 +131,6 @@ func (s *PromptTemplateService) GeneratePrompt(ctx context.Context, templateID s
 		if runtimeParameters == nil {
 			runtimeParameters = map[string]string{}
 		}
-		if _, exists := runtimeParameters["param1"]; !exists {
-			runtimeParameters["param1"] = sysConfig.Param1
-		}
-		if _, exists := runtimeParameters["param2"]; !exists {
-			runtimeParameters["param2"] = sysConfig.Param2
-		}
 
 		for key, val := range runtimeParameters {
 			placeholder := fmt.Sprintf("{{.%s}}", key)
