@@ -27,7 +27,7 @@ export async function deleteModelApiConfig(id: string): Promise<string> {
   return unwrap(res.data)
 }
 
-export async function testModelApiConfig(id: string): Promise<void> {
+export async function testModelApiConfig(id: string): Promise<{message: string}> {
   const res = await http.post<ApiResponse<{message: string}>>(`/model-api-configs/${id}/test`)
   return unwrap(res.data)
 }

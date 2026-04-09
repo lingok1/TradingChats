@@ -55,8 +55,6 @@ export type ScheduleConfig = {
   name: string
   cron_expr: string
   template_id: string
-  param1: string
-  param2: string
   status: 'active' | 'paused'
   created_at?: TimeLike
   updated_at?: TimeLike

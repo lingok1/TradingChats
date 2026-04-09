@@ -20,7 +20,7 @@ export async function updatePromptTemplate(
   return unwrap(res.data)
 }
 
-export async function deletePromptTemplate(id: string): Promise<void> {
+export async function deletePromptTemplate(id: string): Promise<{message: string}> {
   const res = await http.delete<ApiResponse<{message: string}>>(`/prompt-templates/${id}`)
   return unwrap(res.data)
 }

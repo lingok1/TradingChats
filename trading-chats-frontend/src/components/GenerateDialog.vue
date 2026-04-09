@@ -35,6 +35,9 @@ async function loadTemplates() {
   templatesLoading.value = true
   try {
     templates.value = await getPromptTemplates()
+    if (templates.value.length > 0 && templates.value[0].id) {
+      form.template_id = templates.value[0].id
+    }
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : String(e))
   } finally {

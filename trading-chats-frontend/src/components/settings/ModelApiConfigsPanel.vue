@@ -21,7 +21,7 @@ const list = ref<ModelAPIConfig[]>([])
 
 // 分页相关
 const currentPage = ref(1)
-const pageSize = ref(5)
+const pageSize = ref(10)
 
 // 计算当前页显示的数据
 const currentList = computed(() => {

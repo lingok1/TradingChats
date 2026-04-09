@@ -241,6 +241,11 @@ func (s *AIResponseService) callAIModel(ctx context.Context, response *models.AI
 		return
 	}
 
+	// 检查响应内容中| 序号 |前面是否有信息，如果有全部删除
+	if index := strings.Index(content, "| 序号 |"); index > 0 {
+		content = content[index:]
+	}
+
 	response.Response = content
 	response.Status = "completed"
 	response.CompletedAt = utils.NowString()

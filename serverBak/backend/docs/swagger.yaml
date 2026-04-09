@@ -1,0 +1,1094 @@
+basePath: /
+definitions:
+  models.GenerateAIRequest:
+    properties:
+      template_id:
+        example: 69b4e08fbd4f24a37ff0a0cc
+        type: string
+    type: object
+  models.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_at:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+    type: object
+  models.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  models.ModelAPIConfig:
+    properties:
+      api_key:
+        type: string
+      api_url:
+        type: string
+      created_at: {}
+      id:
+        type: string
+      models:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      provider:
+        type: string
+      tenant_id:
+        type: string
+      updated_at: {}
+    type: object
+  models.PromptTemplate:
+    properties:
+      content:
+        type: string
+      created_at: {}
+      id:
+        type: string
+      name:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      tenant_id:
+        type: string
+      updated_at: {}
+    type: object
+  models.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  models.RegisterRequest:
+    properties:
+      display_name:
+        type: string
+      password:
+        type: string
+      tenant_code:
+        type: string
+      tenant_name:
+        type: string
+      username:
+        type: string
+    required:
+    - display_name
+    - password
+    - tenant_code
+    - tenant_name
+    - username
+    type: object
+  models.ResetPasswordRequest:
+    properties:
+      new_password:
+        type: string
+      username:
+        type: string
+    required:
+    - new_password
+    - username
+    type: object
+  models.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      msg:
+        type: string
+    type: object
+  models.Role:
+    enum:
+    - admin
+    - tenant
+    type: string
+    x-enum-varnames:
+    - RoleAdmin
+    - RoleTenant
+  models.SaveSystemBasicConfigRequest:
+    properties:
+      system_logo:
+        type: string
+      system_title:
+        type: string
+    type: object
+  models.SaveSystemParametersRequest:
+    properties:
+      parameters:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  models.ScheduleConfig:
+    properties:
+      created_at: {}
+      cron_expr:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      status:
+        type: string
+      template_id:
+        type: string
+      tenant_id:
+        type: string
+      updated_at: {}
+    type: object
+  models.UpdateStatusRequest:
+    properties:
+      id:
+        type: string
+      status:
+        enum:
+        - active
+        - paused
+        type: string
+    required:
+    - id
+    - status
+    type: object
+  models.User:
+    properties:
+      created_at: {}
+      display_name:
+        type: string
+      id:
+        type: string
+      last_login_at: {}
+      role:
+        $ref: '#/definitions/models.Role'
+      status:
+        type: string
+      tenant_id:
+        type: string
+      updated_at: {}
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Trading Chats 后端服务接口文档
+  title: Trading Chats Backend API
+  version: "1.0"
+paths:
+  /api/ai-responses:
+    get:
+      description: 获取当前可见的 AI 响应列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取 AI 响应列表
+      tags:
+      - AI响应
+  /api/ai-responses/{id}:
+    get:
+      description: 根据 ID 获取 AI 响应详情
+      parameters:
+      - description: AI 响应ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取 AI 响应详情
+      tags:
+      - AI响应
+  /api/ai-responses/batch:
+    get:
+      description: 根据 batch_id 获取 AI 响应列表
+      parameters:
+      - description: 批次ID
+        in: query
+        name: batch_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 按批次获取 AI 响应
+      tags:
+      - AI响应
+  /api/ai-responses/generate:
+    post:
+      consumes:
+      - application/json
+      description: 根据模板生成一批 AI 响应
+      parameters:
+      - description: 生成请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.GenerateAIRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 生成 AI 响应
+      tags:
+      - AI响应
+  /api/ai-responses/latest:
+    get:
+      description: 获取最近成功生成的 AI 响应批次
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取最近成功批次
+      tags:
+      - AI响应
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: '使用用户名与密码获取访问令牌，返回的 access_token 用于后续请求的 Authorization Header (格式:
+        Bearer <token>)'
+      parameters:
+      - description: 登录请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 用户登录
+      tags:
+      - 鉴权
+  /api/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: 使用 refresh token 注销当前会话
+      parameters:
+      - description: 登出请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 用户登出
+      tags:
+      - 鉴权
+  /api/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: 使用 refresh token 获取新的访问令牌
+      parameters:
+      - description: 刷新令牌请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 刷新令牌
+      tags:
+      - 鉴权
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: '创建租户与租户管理员账号，并直接返回登录令牌 (access_token 用于后续请求的 Authorization Header，格式:
+        Bearer <token>)'
+      parameters:
+      - description: 注册请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 用户注册
+      tags:
+      - 鉴权
+  /api/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: 使用用户名直接重置密码，并使该用户全部会话失效
+      parameters:
+      - description: 重置密码请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 重置密码
+      tags:
+      - 鉴权
+  /api/model-api-configs:
+    get:
+      description: 获取所有模型与API配置列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取所有模型与API配置
+      tags:
+      - 模型与API配置
+    post:
+      consumes:
+      - application/json
+      description: 创建新的模型与API配置
+      parameters:
+      - description: 模型与API配置信息
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.ModelAPIConfig'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 创建模型与API配置
+      tags:
+      - 模型与API配置
+  /api/model-api-configs/{id}:
+    delete:
+      description: 删除模型与API配置
+      parameters:
+      - description: 模型与API配置ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 删除模型与API配置
+      tags:
+      - 模型与API配置
+    get:
+      description: 根据ID获取模型与API配置详情
+      parameters:
+      - description: 模型与API配置ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 根据ID获取模型与API配置
+      tags:
+      - 模型与API配置
+    put:
+      consumes:
+      - application/json
+      description: 更新模型与API配置信息
+      parameters:
+      - description: 模型与API配置ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 模型与API配置信息
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.ModelAPIConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 更新模型与API配置
+      tags:
+      - 模型与API配置
+  /api/model-api-configs/{id}/test:
+    post:
+      description: 测试模型与API的连通性
+      parameters:
+      - description: 模型与API配置ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 测试模型的连通性
+      tags:
+      - 模型与API配置
+  /api/model-api-configs/provider:
+    get:
+      description: 根据提供商获取模型与API配置列表
+      parameters:
+      - description: 提供商
+        in: query
+        name: provider
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 根据提供商获取模型与API配置
+      tags:
+      - 模型与API配置
+  /api/prompt-templates:
+    get:
+      description: 获取当前可见的提示词模板列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取提示词模板列表
+      tags:
+      - 提示词模板
+    post:
+      consumes:
+      - application/json
+      description: 创建新的提示词模板
+      parameters:
+      - description: 提示词模板
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PromptTemplate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 创建提示词模板
+      tags:
+      - 提示词模板
+  /api/prompt-templates/{id}:
+    delete:
+      description: 根据 ID 删除提示词模板
+      parameters:
+      - description: 提示词模板ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 删除提示词模板
+      tags:
+      - 提示词模板
+    get:
+      description: 根据 ID 获取提示词模板
+      parameters:
+      - description: 提示词模板ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取提示词模板详情
+      tags:
+      - 提示词模板
+    put:
+      consumes:
+      - application/json
+      description: 根据 ID 更新提示词模板
+      parameters:
+      - description: 提示词模板ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 提示词模板
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.PromptTemplate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 更新提示词模板
+      tags:
+      - 提示词模板
+  /api/prompt-templates/generate:
+    post:
+      consumes:
+      - application/json
+      description: 基于模板生成 Prompt 内容
+      parameters:
+      - description: 生成请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.GenerateAIRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 生成 Prompt
+      tags:
+      - 提示词模板
+  /api/prompt-templates/tag:
+    get:
+      description: 根据 tag 查询提示词模板
+      parameters:
+      - description: 标签
+        in: query
+        name: tag
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 按标签获取提示词模板
+      tags:
+      - 提示词模板
+  /api/schedules:
+    get:
+      description: 获取当前可见的定时任务配置列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取定时任务列表
+      tags:
+      - 定时任务
+    post:
+      consumes:
+      - application/json
+      description: 创建新的定时任务配置
+      parameters:
+      - description: 定时任务配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ScheduleConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 创建定时任务
+      tags:
+      - 定时任务
+  /api/schedules/{id}:
+    delete:
+      description: 根据 ID 删除定时任务配置
+      parameters:
+      - description: 定时任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 删除定时任务
+      tags:
+      - 定时任务
+  /api/schedules/{id}/logs:
+    get:
+      description: 根据任务 ID 获取执行日志
+      parameters:
+      - description: 定时任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取定时任务日志
+      tags:
+      - 定时任务
+  /api/schedules/{id}/trigger:
+    post:
+      description: 立即执行指定定时任务
+      parameters:
+      - description: 定时任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 手动触发定时任务
+      tags:
+      - 定时任务
+  /api/schedules/status:
+    put:
+      consumes:
+      - application/json
+      description: 将定时任务切换为 active 或 paused
+      parameters:
+      - description: 状态更新请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 更新定时任务状态
+      tags:
+      - 定时任务
+  /api/system-config:
+    get:
+      description: 获取当前系统配置
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取系统配置
+      tags:
+      - 系统配置
+  /api/system-config/basic:
+    put:
+      consumes:
+      - application/json
+      description: 保存系统标题与 Logo 等基础配置
+      parameters:
+      - description: 基础配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.SaveSystemBasicConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 保存基础系统配置
+      tags:
+      - 系统配置
+  /api/system-config/parameters:
+    put:
+      consumes:
+      - application/json
+      description: 保存系统动态参数字典
+      parameters:
+      - description: 动态参数配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.SaveSystemParametersRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 保存动态参数配置
+      tags:
+      - 系统配置
+  /health:
+    get:
+      description: 返回服务健康状态
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 健康检查
+      tags:
+      - 系统
+securityDefinitions:
+  BearerAuth:
+    description: '请输入 JWT Token，格式为: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

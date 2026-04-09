@@ -15,7 +15,7 @@ const loading = ref(false)
 const list = ref<PromptTemplate[]>([])
 
 const currentPage = ref(1)
-const pageSize = ref(5)
+const pageSize = ref(10)
 
 const currentList = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value

@@ -1,7 +1,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Setting, Moon, Sunny, HomeFilled, DataAnalysis, Goods, Position, Notification, Refresh } from '@element-plus/icons-vue'
+import { Setting, Moon, Sunny, HomeFilled, DataAnalysis, Goods, Position, Notification, Refresh, Menu } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { AIResponse } from './api/types'
 import { getSystemConfig } from './api/systemConfig'
@@ -21,11 +21,14 @@ const { mode } = useTheme()
 
 const activeTab = ref('home')
 const startX = ref(0)
+const startY = ref(0)
 const endX = ref(0)
+const endY = ref(0)
 const loginOpen = ref(false)
 const accessToken = ref('')
 const refreshToken = ref('')
 const currentUsername = ref('')
+const mobileMenuOpen = ref(false)
 
 const authStorageKey = 'tc_auth'
 
@@ -94,29 +97,44 @@ function clearAuth() {
 
 function handleTabChange(tab: any) {
   activeTab.value = tab.props.name as string
+  mobileMenuOpen.value = false
+}
+
+function handleMobileTabChange(tabName: string) {
+  activeTab.value = tabName
+  mobileMenuOpen.value = false
 }
 
 function handleTouchStart(event: TouchEvent) {
   if (!isMobile.value) return
   startX.value = event.touches[0].clientX
+  startY.value = event.touches[0].clientY
 }
 
 function handleTouchEnd(event: TouchEvent) {
   if (!isMobile.value) return
   endX.value = event.changedTouches[0].clientX
-  const diff = startX.value - endX.value
+  endY.value = event.changedTouches[0].clientY
+  
+  const diffX = startX.value - endX.value
+  const diffY = startY.value - endY.value
+  
+  // 只处理水平滑动，忽略垂直滑动
+  if (Math.abs(diffX) > Math.abs(diffY)) {
+    const threshold = 50
+    if (Math.abs(diffX) > threshold) {
+      const tabNames = ['home', 'daily', 'multi', 'position', 'news']
+      const currentIndex = tabNames.indexOf(activeTab.value)
 
-  const threshold = 50
-  if (Math.abs(diff) > threshold) {
-    const tabNames = ['home', 'daily', 'multi', 'position', 'news']
-    const currentIndex = tabNames.indexOf(activeTab.value)
-
-    if (diff > 0) {
-      const nextIndex = (currentIndex + 1) % tabNames.length
-      activeTab.value = tabNames[nextIndex]
-    } else {
-      const prevIndex = (currentIndex - 1 + tabNames.length) % tabNames.length
-      activeTab.value = tabNames[prevIndex]
+      if (diffX > 0) {
+        // 向左滑动，切换到下一个标签
+        const nextIndex = (currentIndex + 1) % tabNames.length
+        activeTab.value = tabNames[nextIndex]
+      } else {
+        // 向右滑动，切换到上一个标签
+        const prevIndex = (currentIndex - 1 + tabNames.length) % tabNames.length
+        activeTab.value = tabNames[prevIndex]
+      }
     }
   }
 }
@@ -293,18 +311,49 @@ onMounted(() => {
       </div>
 
       <div class="tc-header-right">
+        <el-button v-if="isMobile" circle @click="mobileMenuOpen = !mobileMenuOpen" title="菜单">
+          <el-icon><Menu /></el-icon>
+        </el-button>
         <el-button circle @click="loadLatest" :loading="loading" title="刷新数据">
           <el-icon><Refresh /></el-icon>
         </el-button>
         <el-button circle @click="mode = mode === 'dark' ? 'light' : 'dark'" :title="mode === 'dark' ? '浅色模式' : '深色模式'">
-          <el-icon v-if="mode !== 'dark'"><Moon /></el-icon>
-          <el-icon v-else><Sunny /></el-icon>
-        </el-button>
+            <el-icon v-if="mode !== 'dark'"><Moon /></el-icon>
+            <el-icon v-else><Sunny /></el-icon>
+          </el-button>
         <el-button circle @click="handleSettingsClick" title="设置">
           <el-icon><Setting /></el-icon>
         </el-button>
       </div>
     </el-header>
+
+    <!-- 移动端菜单 -->
+    <el-drawer
+      v-if="isMobile"
+      v-model="mobileMenuOpen"
+      direction="top"
+      size="50%"
+      :with-header="false"
+    >
+      <div class="tc-mobile-menu">
+        <div 
+          v-for="tab in ['home', 'daily', 'multi', 'position', 'news']" 
+          :key="tab"
+          class="tc-mobile-menu-item"
+          :class="{ active: activeTab === tab }"
+          @click="handleMobileTabChange(tab)"
+        >
+          <div class="tc-mobile-menu-icon">
+            <HomeFilled v-if="tab === 'home'" />
+            <DataAnalysis v-else-if="tab === 'daily'" />
+            <Goods v-else-if="tab === 'multi'" />
+            <Position v-else-if="tab === 'position'" />
+            <Notification v-else-if="tab === 'news'" />
+          </div>
+          <span class="tc-mobile-menu-text">{{ tabMeta[tab].title }}</span>
+        </div>
+      </div>
+    </el-drawer>
 
     <el-main class="tc-main" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
       <template v-if="isHomeTab">
@@ -354,6 +403,45 @@ onMounted(() => {
         </el-result>
       </div>
     </el-main>
+
+    <!-- ===== 页脚信息 ===== -->
+    <div class="box my-footer" style="
+      width: 100%;
+      padding: 15px 0;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.03);
+      border-top: 1px solid #e0e0e0;
+      font-size: 13px;
+      color: #888;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      user-select: none;
+      margin-top: 20px;
+    ">
+      <ul class="link line-right" style="
+        list-style: none;
+        padding: 0;
+        margin: 0 0 10px 0;
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+      ">
+        <li style="cursor: pointer;">
+          <i class="iconfont icon-html" style="font-size: 18px; color: #666;"></i>
+        </li>
+        <li style="cursor: pointer; position: relative;">
+          <i class="iconfont icon-weixin" style="font-size: 18px; color: #666;"></i>
+        </li>
+      </ul>
+      <div class="about">
+         <p class="copyright" style="margin: 0 0 5px 0;">
+          © 2026 凌期AI个人自用
+        </p>
+        <p class="copyright" style="margin: 0 0 5px 0; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+          <a href="http://beian.miit.gov.cn" target="_blank" style="color: #666; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#1890ff'" onmouseout="this.style.color='#666'">ICP主体备案号：浙ICP备2026020164号</a>
+          <a href="https://beian.mps.gov.cn/#/" target="_blank" style="color: #666; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#1890ff'" onmouseout="this.style.color='#666'">全国互联网安全管理服务平台</a>
+        </p>
+      </div>
+    </div>
 
     <SettingsDrawer
       v-if="isLoggedIn"
@@ -522,5 +610,43 @@ onMounted(() => {
   }
 }
 
+.tc-mobile-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 8px;
+}
+
+.tc-mobile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.tc-mobile-menu-item:hover {
+  background: var(--el-color-primary-light-9);
+}
+
+.tc-mobile-menu-item.active {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+
+.tc-mobile-menu-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tc-mobile-menu-text {
+  font-size: 16px;
+  font-weight: 500;
+}
 
 </style>

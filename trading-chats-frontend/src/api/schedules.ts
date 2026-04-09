@@ -18,7 +18,7 @@ export async function deleteSchedule(id: string): Promise<string> {
 }
 
 export async function updateScheduleStatus(id: string, status: 'active' | 'paused'): Promise<string> {
-  const res = await http.put<ApiResponse<string>>(`/schedules/${id}/status`, { status })
+  const res = await http.put<ApiResponse<string>>('/schedules/status', { id, status })
   return unwrap(res.data)
 }
 

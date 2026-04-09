@@ -26,9 +26,18 @@ export function parseMarkdownTable(markdown: string): MarkdownTable | null {
   const sepLine = lines[1]
   if (!sepLine.includes('---')) return null
 
-  const headers = splitRow(headerLine)
-  const rows = lines.slice(2).map(splitRow).filter((r) => r.length > 0)
+  let headers = splitRow(headerLine)
+  let rows = lines.slice(2).map(splitRow).filter((r) => r.length > 0)
   if (headers.length === 0 || rows.length === 0) return null
+
+  // 查找序号列的位置
+  const indexCol = findColumnIndex(headers, ['序号'])
+  
+  // 如果序号列存在且不是第一列，删除序号列前面的所有列
+  if (indexCol > 0) {
+    headers = headers.slice(indexCol)
+    rows = rows.map(row => row.slice(indexCol))
+  }
 
   return { headers, rows }
 }

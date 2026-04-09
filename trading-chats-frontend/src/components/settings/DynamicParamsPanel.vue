@@ -19,7 +19,7 @@ const form = reactive<SystemConfig>({
 
 const paramList = ref<{ key: string; value: string }[]>([])
 const currentPage = ref(1)
-const pageSize = ref(5)
+const pageSize = ref(10)
 
 const currentParams = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value

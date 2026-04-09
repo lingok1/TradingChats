@@ -2,8 +2,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
-import type { ScheduleConfig, ScheduleLog } from '../../api/types'
+import type { ScheduleConfig, ScheduleLog, PromptTemplate } from '../../api/types'
 import { createSchedule, deleteSchedule, getScheduleLogs, getSchedules, updateScheduleStatus } from '../../api/schedules'
+import { getPromptTemplates } from '../../api/promptTemplates'
 import { asTimeString } from '../../utils/time'
 
 const props = defineProps<{
@@ -13,9 +14,11 @@ const props = defineProps<{
 const loading = ref(false)
 const toggleLoadingMap = reactive<Record<string, boolean>>({})
 const list = ref<ScheduleConfig[]>([])
+const promptTemplates = ref<PromptTemplate[]>([])
+const templatesLoading = ref(false)
 
 const currentPage = ref(1)
-const pageSize = ref(5)
+const pageSize = ref(10)
 
 const currentList = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
@@ -50,20 +53,33 @@ const form = reactive({
   name: '',
   cron_expr: '',
   template_id: '',
-  param1: '',
-  param2: '',
-  status: 'active' as 'active' | 'paused',
+  status: 'paused' as 'active' | 'paused',
 })
 
 const createTitle = computed(() => '新建定时任务')
+
+async function fetchPromptTemplates() {
+  templatesLoading.value = true
+  try {
+    promptTemplates.value = await getPromptTemplates()
+    if (promptTemplates.value.length > 0 && !form.template_id && promptTemplates.value[0].id) {
+      form.template_id = promptTemplates.value[0].id
+    }
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } finally {
+    templatesLoading.value = false
+  }
+}
 
 function resetForm() {
   form.name = ''
   form.cron_expr = ''
   form.template_id = ''
-  form.param1 = ''
-  form.param2 = ''
-  form.status = 'active'
+  form.status = 'paused'
+  if (promptTemplates.value.length > 0 && promptTemplates.value[0].id) {
+    form.template_id = promptTemplates.value[0].id
+  }
 }
 
 async function refresh() {
@@ -91,8 +107,6 @@ async function submitCreate() {
     name: form.name.trim(),
     cron_expr: form.cron_expr.trim(),
     template_id: form.template_id.trim(),
-    param1: form.param1.trim(),
-    param2: form.param2.trim(),
     status: form.status,
   }
   if (!body.name || !body.cron_expr || !body.template_id) {
@@ -185,8 +199,9 @@ async function openLogs(row: ScheduleConfig) {
   }
 }
 
-onMounted(() => {
-  refresh()
+onMounted(async () => {
+  await fetchPromptTemplates()
+  await refresh()
 })
 </script>
 
@@ -265,13 +280,14 @@ onMounted(() => {
           <el-input v-model="form.cron_expr" placeholder="例如：*/10 * * * * *（秒级）" />
         </el-form-item>
         <el-form-item label="template_id">
-          <el-input v-model="form.template_id" />
-        </el-form-item>
-        <el-form-item label="param1（URL）">
-          <el-input v-model="form.param1" />
-        </el-form-item>
-        <el-form-item label="param2（URL）">
-          <el-input v-model="form.param2" />
+          <el-select v-model="form.template_id" placeholder="请选择提示模板" :loading="templatesLoading">
+            <el-option
+              v-for="template in promptTemplates"
+              :key="template.id"
+              :label="template.name"
+              :value="template.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="初始状态">
           <el-radio-group v-model="form.status" :size="mobile ? 'small' : 'default'">
