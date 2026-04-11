@@ -67,10 +67,14 @@ function onClickRow(row: SignalRow) {
                   {{ row.direction }}
                 </el-tag>
               </div>
-              <div class="tc-signal-sub">入场区间：{{ row.entryRange }}{{ mobile ? ' 元' : '' }}</div>
-              <div v-if="row.stopLoss" class="tc-signal-sub">止损：{{ row.stopLoss }}{{ mobile ? ' 元' : '' }}</div>
-              <div v-if="row.takeProfit" class="tc-signal-sub">止盈：{{ row.takeProfit }}{{ mobile ? ' 元' : '' }}</div>
-              <div v-if="row.holdingTime" class="tc-signal-sub">持仓时间：{{ row.holdingTime }}{{ mobile ? ' 天' : '' }}</div>
+              <div class="tc-signal-row">
+                <div class="tc-signal-sub">入场区间：{{ row.entryRange }}{{ mobile ? ' 元' : '' }}</div>
+                <div v-if="row.stopLoss" class="tc-signal-sub">止损：{{ row.stopLoss }}{{ mobile ? ' 元' : '' }}</div>
+              </div>
+              <div class="tc-signal-row">
+                <div v-if="row.holdingTime" class="tc-signal-sub">持仓时间：{{ row.holdingTime }}{{ mobile ? ' 天' : '' }}</div>
+                <div v-if="row.takeProfit" class="tc-signal-sub">止盈：{{ row.takeProfit }}{{ mobile ? ' 元' : '' }}</div>
+              </div>
             </el-card>
           </div>
 
@@ -127,6 +131,11 @@ function onClickRow(row: SignalRow) {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  margin-top: 6px;
+}
+
+.tc-signal-row:first-child {
+  margin-top: 0;
 }
 
 .tc-signal-symbol {
@@ -135,7 +144,6 @@ function onClickRow(row: SignalRow) {
 }
 
 .tc-signal-sub {
-  margin-top: 6px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }

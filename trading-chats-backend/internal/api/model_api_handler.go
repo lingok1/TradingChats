@@ -37,6 +37,12 @@ func (h *ModelAPIHandler) CreateModelAPIConfig(c *gin.Context) {
 		return
 	}
 
+	// 设置租户ID
+	authCtx := MustGetAuthContext(c)
+	if authCtx != nil {
+		config.TenantID = authCtx.TenantID
+	}
+
 	if err := h.service.CreateModelAPIConfig(c.Request.Context(), &config); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
 		return
@@ -127,6 +133,13 @@ func (h *ModelAPIHandler) UpdateModelAPIConfig(c *gin.Context) {
 	}
 
 	config.ID, _ = models.ParseObjectID(id)
+
+	// 设置租户ID
+	authCtx := MustGetAuthContext(c)
+	if authCtx != nil {
+		config.TenantID = authCtx.TenantID
+	}
+
 	if err := h.service.UpdateModelAPIConfig(c.Request.Context(), &config); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
 		return

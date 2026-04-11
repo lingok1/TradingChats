@@ -27,3 +27,8 @@ export async function getScheduleLogs(id: string): Promise<ScheduleLog[]> {
   return unwrap(res.data)
 }
 
+export async function updateSchedule(id: string, body: Omit<ScheduleConfig, 'id' | 'created_at' | 'updated_at'>): Promise<string> {
+  const res = await http.put<ApiResponse<string>>(`/schedules/${id}`, body)
+  return unwrap(res.data)
+}
+

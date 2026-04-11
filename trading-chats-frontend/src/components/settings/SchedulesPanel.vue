@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh, Edit } from '@element-plus/icons-vue'
 import type { ScheduleConfig, ScheduleLog, PromptTemplate } from '../../api/types'
-import { createSchedule, deleteSchedule, getScheduleLogs, getSchedules, updateScheduleStatus } from '../../api/schedules'
+import { createSchedule, deleteSchedule, getScheduleLogs, getSchedules, updateSchedule, updateScheduleStatus } from '../../api/schedules'
 import { getPromptTemplates } from '../../api/promptTemplates'
 import { asTimeString } from '../../utils/time'
 
@@ -36,12 +36,14 @@ function handleCurrentChange(current: number) {
 }
 
 const createOpen = ref(false)
+
 const logsOpen = ref(false)
 const logsLoading = ref(false)
 const logs = ref<ScheduleLog[]>([])
 const logsCurrentPage = ref(1)
 const logsPageSize = ref(10)
 const logsFor = ref<ScheduleConfig | null>(null)
+const currentEditId = ref<string>('')
 
 const pagedLogs = computed(() => {
   const start = (logsCurrentPage.value - 1) * logsPageSize.value
@@ -56,7 +58,7 @@ const form = reactive({
   status: 'paused' as 'active' | 'paused',
 })
 
-const createTitle = computed(() => '新建定时任务')
+const createTitle = computed(() => currentEditId.value ? '编辑定时任务' : '新建定时任务')
 
 async function fetchPromptTemplates() {
   templatesLoading.value = true
@@ -99,6 +101,16 @@ async function refresh() {
 
 function openCreate() {
   resetForm()
+  currentEditId.value = ''
+  createOpen.value = true
+}
+
+function openEdit(row: ScheduleConfig) {
+  currentEditId.value = row.id || ''
+  form.name = row.name || ''
+  form.cron_expr = row.cron_expr || ''
+  form.template_id = row.template_id || ''
+  form.status = (row.status || 'paused') as 'active' | 'paused'
   createOpen.value = true
 }
 
@@ -116,8 +128,13 @@ async function submitCreate() {
 
   loading.value = true
   try {
-    await createSchedule(body)
-    ElMessage.success('已创建')
+    if (currentEditId.value) {
+      await updateSchedule(currentEditId.value, body)
+      ElMessage.success('已更新')
+    } else {
+      await createSchedule(body)
+      ElMessage.success('已创建')
+    }
     createOpen.value = false
     currentPage.value = 1
     await refresh()
@@ -251,6 +268,12 @@ onMounted(async () => {
                 {{ scope.row.status === 'active' ? '暂停' : '启用' }}
               </el-button>
               <el-button size="small" text type="info" @click="openLogs(scope.row)" v-if="!mobile">日志</el-button>
+              <el-button size="small" text type="warning" @click="openEdit(scope.row)" v-if="!mobile">
+                <template #icon>
+                  <Edit />
+                </template>
+                编辑
+              </el-button>
               <el-button size="small" text type="danger" @click="remove(scope.row)">删除</el-button>
             </el-space>
           </template>

@@ -86,6 +86,7 @@ func SetupRoutes(
 
 	protected := r.Group("/api")
 	protected.Use(AuthMiddleware(authService))
+	protected.Use(TenantIDMiddleware())
 	{
 		protected.POST("/prompt-templates", RequireRoles(models.RoleAdmin, models.RoleTenant), promptTemplateHandler.CreatePromptTemplate)
 		protected.PUT("/prompt-templates/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), promptTemplateHandler.UpdatePromptTemplate)
@@ -100,6 +101,7 @@ func SetupRoutes(
 		protected.POST("/ai-responses/generate", RequireRoles(models.RoleAdmin, models.RoleTenant), aiResponseHandler.GenerateBatchAIResponses)
 
 		protected.POST("/schedules", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.CreateConfig)
+		protected.PUT("/schedules/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.UpdateConfig)
 		protected.PUT("/schedules/status", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.UpdateConfigStatus)
 		protected.DELETE("/schedules/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.DeleteConfig)
 		protected.POST("/schedules/:id/trigger", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.TriggerNow)

@@ -36,6 +36,12 @@ func (h *ScheduleHandler) CreateConfig(c *gin.Context) {
 		return
 	}
 
+	// 设置租户ID
+	authCtx := MustGetAuthContext(c)
+	if authCtx != nil {
+		config.TenantID = authCtx.TenantID
+	}
+
 	if err := h.service.CreateConfig(c.Request.Context(), &config); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
 		return
@@ -127,6 +133,43 @@ func (h *ScheduleHandler) GetLogsByConfigID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(logs))
+}
+
+// UpdateConfig 更新定时任务
+// @Summary 更新定时任务
+// @Description 更新指定定时任务的配置
+// @Tags 定时任务
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "定时任务ID"
+// @Param body body models.ScheduleConfig true "定时任务配置"
+// @Success 200 {object} models.Response
+// @Failure 400 {object} models.Response
+// @Failure 500 {object} models.Response
+// @Router /api/schedules/{id} [put]
+func (h *ScheduleHandler) UpdateConfig(c *gin.Context) {
+	id := c.Param("id")
+	var config models.ScheduleConfig
+	if err := c.ShouldBindJSON(&config); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(400, err.Error()))
+		return
+	}
+
+	// 更新配置
+	updateData := map[string]interface{}{
+		"name":        config.Name,
+		"cron_expr":   config.CronExpr,
+		"template_id": config.TemplateID,
+		"status":      config.Status,
+	}
+
+	if err := h.service.UpdateConfig(c.Request.Context(), id, updateData); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse("updated successfully"))
 }
 
 // TriggerNow 手动触发定时任务

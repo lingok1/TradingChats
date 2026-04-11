@@ -182,6 +182,21 @@ func (s *ScheduleService) GetConfigs(ctx context.Context) ([]models.ScheduleConf
 	return s.repo.GetAllConfigs(ctx)
 }
 
+func (s *ScheduleService) UpdateConfig(ctx context.Context, id string, updateData map[string]interface{}) error {
+	if err := s.repo.UpdateConfig(ctx, id, updateData); err != nil {
+		return err
+	}
+	config, err := s.repo.GetConfigByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if config.Status == "active" {
+		return s.addTaskToCron(*config)
+	}
+	s.removeTaskFromCron(id)
+	return nil
+}
+
 func (s *ScheduleService) GetLogsByConfigID(ctx context.Context, configID string) ([]models.ScheduleLog, error) {
 	return s.repo.GetLogsByConfigID(ctx, configID)
 }

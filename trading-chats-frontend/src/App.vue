@@ -1,7 +1,7 @@
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { Setting, Moon, Sunny, HomeFilled, DataAnalysis, Goods, Position, Notification, Refresh, Menu } from '@element-plus/icons-vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { Setting, Moon, Sunny, DataAnalysis, Position, Notification, Refresh, Menu, ArrowUp, Calendar, PieChart } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { AIResponse } from './api/types'
 import { getSystemConfig } from './api/systemConfig'
@@ -19,7 +19,7 @@ import LoginDialog from './components/LoginDialog.vue'
 const { isMobile } = useIsMobile()
 const { mode } = useTheme()
 
-const activeTab = ref('home')
+const activeTab = ref('futures')
 const startX = ref(0)
 const startY = ref(0)
 const endX = ref(0)
@@ -30,33 +30,56 @@ const refreshToken = ref('')
 const currentUsername = ref('')
 const mobileMenuOpen = ref(false)
 
+// 返回顶部按钮相关
+const showBackToTop = ref(false)
+const scrollThreshold = 200
+
+function handleScroll() {
+  showBackToTop.value = window.scrollY > scrollThreshold
+}
+
+function scrollToTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  })
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
+
 const authStorageKey = 'tc_auth'
 
 const tabMeta: Record<string, { title: string; description: string }> = {
-  home: {
-    title: '首页',
+  futures: {
+    title: '期货',
     description: '展示最新一批 AI 分析结果。',
   },
-  daily: {
-    title: '当日分析',
-    description: '该页面暂未开发完成，敬请期待。',
-  },
-  multi: {
-    title: '多品种',
-    description: '该页面暂未开发完成，敬请期待。',
-  },
-  position: {
-    title: '持仓',
+  options: {
+    title: '期权',
     description: '该页面暂未开发完成，敬请期待。',
   },
   news: {
     title: '新闻',
     description: '该页面暂未开发完成，敬请期待。',
   },
+  plan: {
+    title: '计划',
+    description: '该页面暂未开发完成，敬请期待。',
+  },
+  position: {
+    title: '持仓',
+    description: '该页面暂未开发完成，敬请期待。',
+  },
 }
 
-const currentTabMeta = computed(() => tabMeta[activeTab.value] ?? tabMeta.home)
-const isHomeTab = computed(() => activeTab.value === 'home')
+const currentTabMeta = computed(() => tabMeta[activeTab.value] ?? tabMeta.futures)
+const isFuturesTab = computed(() => activeTab.value === 'futures')
 const isLoggedIn = computed(() => accessToken.value.length > 0)
 
 function persistAuth() {
@@ -123,7 +146,7 @@ function handleTouchEnd(event: TouchEvent) {
   if (Math.abs(diffX) > Math.abs(diffY)) {
     const threshold = 50
     if (Math.abs(diffX) > threshold) {
-      const tabNames = ['home', 'daily', 'multi', 'position', 'news']
+      const tabNames = ['futures', 'options', 'news', 'plan', 'position']
       const currentIndex = tabNames.indexOf(activeTab.value)
 
       if (diffX > 0) {
@@ -267,35 +290,19 @@ onMounted(() => {
       
       <div class="tc-header-tabs" v-if="!isMobile">
         <el-tabs v-model="activeTab" @tab-click="(tab: any) => handleTabChange(tab)" class="ogo-tabs">
-          <el-tab-pane :name="'home'">
-            <template #label>
-              <div class="ogo-tabs-tab-btn">
-                <div class="ogo-tabs-icon"><HomeFilled /></div>
-                <span class="ogo-tabs-text">首页</span>
-              </div>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane :name="'daily'">
+          <el-tab-pane :name="'futures'">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><DataAnalysis /></div>
-                <span class="ogo-tabs-text">当日分析</span>
+                <span class="ogo-tabs-text">期货</span>
               </div>
             </template>
           </el-tab-pane>
-          <el-tab-pane :name="'multi'">
+          <el-tab-pane :name="'options'">
             <template #label>
               <div class="ogo-tabs-tab-btn">
-                <div class="ogo-tabs-icon"><Goods /></div>
-                <span class="ogo-tabs-text">多品种</span>
-              </div>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane :name="'position'">
-            <template #label>
-              <div class="ogo-tabs-tab-btn">
-                <div class="ogo-tabs-icon"><Position /></div>
-                <span class="ogo-tabs-text">持仓</span>
+                <div class="ogo-tabs-icon"><PieChart /></div>
+                <span class="ogo-tabs-text">期权</span>
               </div>
             </template>
           </el-tab-pane>
@@ -304,6 +311,22 @@ onMounted(() => {
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><Notification /></div>
                 <span class="ogo-tabs-text">新闻</span>
+              </div>
+            </template>
+          </el-tab-pane>
+          <el-tab-pane :name="'plan'">
+            <template #label>
+              <div class="ogo-tabs-tab-btn">
+                <div class="ogo-tabs-icon"><Calendar /></div>
+                <span class="ogo-tabs-text">计划</span>
+              </div>
+            </template>
+          </el-tab-pane>
+          <el-tab-pane :name="'position'">
+            <template #label>
+              <div class="ogo-tabs-tab-btn">
+                <div class="ogo-tabs-icon"><Position /></div>
+                <span class="ogo-tabs-text">持仓</span>
               </div>
             </template>
           </el-tab-pane>
@@ -337,18 +360,18 @@ onMounted(() => {
     >
       <div class="tc-mobile-menu">
         <div 
-          v-for="tab in ['home', 'daily', 'multi', 'position', 'news']" 
+          v-for="tab in ['futures', 'options', 'news', 'plan', 'position']" 
           :key="tab"
           class="tc-mobile-menu-item"
           :class="{ active: activeTab === tab }"
           @click="handleMobileTabChange(tab)"
         >
           <div class="tc-mobile-menu-icon">
-            <HomeFilled v-if="tab === 'home'" />
-            <DataAnalysis v-else-if="tab === 'daily'" />
-            <Goods v-else-if="tab === 'multi'" />
-            <Position v-else-if="tab === 'position'" />
+            <DataAnalysis v-if="tab === 'futures'" />
+            <PieChart v-else-if="tab === 'options'" />
             <Notification v-else-if="tab === 'news'" />
+            <Calendar v-else-if="tab === 'plan'" />
+            <Position v-else-if="tab === 'position'" />
           </div>
           <span class="tc-mobile-menu-text">{{ tabMeta[tab].title }}</span>
         </div>
@@ -356,7 +379,7 @@ onMounted(() => {
     </el-drawer>
 
     <el-main class="tc-main" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
-      <template v-if="isHomeTab">
+      <template v-if="isFuturesTab">
         <div class="tc-toolbar">
           <div>
             <div class="tc-batch">批次：{{ currentBatchId || '-' }}</div>
@@ -460,6 +483,19 @@ onMounted(() => {
     />
 
     <LoginDialog v-model="loginOpen" @success="handleLoginSuccess" />
+
+    <!-- 返回顶部按钮 -->
+    <el-button
+      v-if="showBackToTop"
+      type="primary"
+      circle
+      class="tc-back-to-top"
+      :size="isMobile ? 'large' : 'default'"
+      @click="scrollToTop"
+      title="返回顶部"
+    >
+      <el-icon><ArrowUp /></el-icon>
+    </el-button>
   </el-container>
 </template>
 
@@ -647,6 +683,27 @@ onMounted(() => {
 .tc-mobile-menu-text {
   font-size: 16px;
   font-weight: 500;
+}
+
+.tc-back-to-top {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.tc-back-to-top:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 768px) {
+  .tc-back-to-top {
+    bottom: 20px;
+    right: 20px;
+  }
 }
 
 </style>

@@ -36,6 +36,12 @@ func (h *PromptTemplateHandler) CreatePromptTemplate(c *gin.Context) {
 		return
 	}
 
+	// 设置租户ID
+	authCtx := MustGetAuthContext(c)
+	if authCtx != nil {
+		template.TenantID = authCtx.TenantID
+	}
+
 	if err := h.service.CreatePromptTemplate(c.Request.Context(), &template); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
 		return
@@ -129,6 +135,12 @@ func (h *PromptTemplateHandler) UpdatePromptTemplate(c *gin.Context) {
 		return
 	}
 	template.ID = parsedID
+
+	// 设置租户ID
+	authCtx := MustGetAuthContext(c)
+	if authCtx != nil {
+		template.TenantID = authCtx.TenantID
+	}
 
 	if err := h.service.UpdatePromptTemplate(c.Request.Context(), &template); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))

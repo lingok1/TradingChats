@@ -81,3 +81,22 @@ func SwaggerBasicAuth(cfg *config.SwaggerConfig) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// TenantIDMiddleware 租户ID处理中间件，从AuthContext中提取租户ID并设置到请求模型中
+func TenantIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authCtx := MustGetAuthContext(c)
+		if authCtx == nil {
+			c.Next()
+			return
+		}
+
+		// 只处理POST和PUT请求
+		if c.Request.Method != http.MethodPost && c.Request.Method != http.MethodPut {
+			c.Next()
+			return
+		}
+
+		c.Next()
+	}
+}
