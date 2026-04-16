@@ -72,7 +72,7 @@ function onClickRow(row: SignalRow) {
                 <div v-if="row.stopLoss" class="tc-signal-sub">止损：{{ row.stopLoss }}{{ mobile ? ' 元' : '' }}</div>
               </div>
               <div class="tc-signal-row">
-                <div v-if="row.holdingTime" class="tc-signal-sub">持仓时间：{{ row.holdingTime }}{{ mobile ? ' 天' : '' }}</div>
+                <div v-if="row.holdingTime" class="tc-signal-sub">持仓时间：{{ row.holdingTime }}</div>
                 <div v-if="row.takeProfit" class="tc-signal-sub">止盈：{{ row.takeProfit }}{{ mobile ? ' 元' : '' }}</div>
               </div>
             </el-card>

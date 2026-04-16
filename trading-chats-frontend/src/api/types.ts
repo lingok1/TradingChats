@@ -76,3 +76,23 @@ export type SystemConfig = {
   parameters: Record<string, string>
   updated_at?: TimeLike
 }
+
+export type NewsItem = {
+  id: string
+  title: string
+  summary: string
+  content: string
+  category: string
+  source: string
+  author?: string
+  publish_time: string
+  image_url?: string
+  read_count?: number
+}
+
+export type NewsCategory = {
+  id: string
+  name: string
+  code: string
+  icon?: string
+}
