@@ -14,8 +14,12 @@
 - ✅导航菜单更改 期货、期权、新闻、计划、持仓、关于
 - ✅批次：删除，时间改为数据更新
 - ✅去掉持仓时间，天
-- ⭐️页面设计期权、新闻、计划、持仓、关于
+- ✅页面设计期权、新闻、计划、持仓、关于
+- ✅移动端将菜单切换放到后面，用户登录放到前面
+- ✅刷新按钮放到main里面
+- ✅右下角默认显示明暗切换，明暗切换和返回顶部放一起，顶部上明暗下
 - 主页介绍仿站 [PnLClaw - Crypto Quantitative Trading Platform](https://www.pnlclaw.com/)
+- 主页介绍仿站[ ](https://www.pnlclaw.com/)[LUCKYQUANT PRO](https://luckyquant.top/)
 - 定时刷新页面，根据系统配置来刷新
 - 后端完成ai response后sse通知前端刷新界面
 - 微信扫码登录

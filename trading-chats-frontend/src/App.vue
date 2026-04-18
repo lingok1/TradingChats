@@ -497,31 +497,19 @@ onMounted(() => {
       </div>
 
       <div class="tc-header-right">
-        <el-button v-if="isMobile" circle @click="mobileMenuOpen = !mobileMenuOpen" title="菜单">
-          <el-icon><Menu /></el-icon>
-        </el-button>
-        <el-button circle @click="loadLatest" :loading="loading" title="刷新数据">
-          <el-icon><Refresh /></el-icon>
-        </el-button>
-        <el-button circle @click="mode = mode === 'dark' ? 'light' : 'dark'" :title="mode === 'dark' ? '浅色模式' : '深色模式'">
-            <el-icon v-if="mode !== 'dark'"><Moon /></el-icon>
-            <el-icon v-else><Sunny /></el-icon>
-          </el-button>
         <el-button circle @click="handleSettingsClick" title="设置">
           <el-icon><User /></el-icon>
+        </el-button>
+        <el-button v-if="isMobile" circle @click="mobileMenuOpen = !mobileMenuOpen" title="菜单">
+          <el-icon><Menu /></el-icon>
         </el-button>
       </div>
     </el-header>
 
     <!-- 移动端菜单 -->
-    <el-drawer
-      v-if="isMobile"
-      v-model="mobileMenuOpen"
-      direction="top"
-      size="50%"
-      :with-header="false"
-    >
-      <div class="tc-mobile-menu">
+    <div v-if="isMobile" class="tc-mobile-menu-container" :class="{ 'open': mobileMenuOpen }">
+      <div class="tc-mobile-menu-overlay" @click="mobileMenuOpen = false"></div>
+      <div class="tc-mobile-menu-content">
         <div 
           v-for="tab in ['futures', 'options', 'news', 'plan', 'position', 'about']" 
           :key="tab"
@@ -530,17 +518,17 @@ onMounted(() => {
           @click="handleMobileTabChange(tab)"
         >
           <div class="tc-mobile-menu-icon">
-            <DataAnalysis v-if="tab === 'futures'" />
-            <PieChart v-else-if="tab === 'options'" />
-            <Notification v-else-if="tab === 'news'" />
-            <Calendar v-else-if="tab === 'plan'" />
-            <Position v-else-if="tab === 'position'" />
-            <InfoFilled v-else-if="tab === 'about'" />
+            <DataAnalysis v-if="tab === 'futures'"></DataAnalysis>
+            <PieChart v-else-if="tab === 'options'"></PieChart>
+            <Notification v-else-if="tab === 'news'"></Notification>
+            <Calendar v-else-if="tab === 'plan'"></Calendar>
+            <Position v-else-if="tab === 'position'"></Position>
+            <InfoFilled v-else-if="tab === 'about'"></InfoFilled>
           </div>
           <span class="tc-mobile-menu-text">{{ tabMeta[tab].title }}</span>
         </div>
       </div>
-    </el-drawer>
+    </div>
 
 
 
@@ -552,6 +540,9 @@ onMounted(() => {
           </div>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <el-tag type="success">成功 {{ successCount }}/{{ totalCount }}</el-tag>
+            <el-button circle @click="loadLatest" :loading="loading" title="刷新数据">
+              <el-icon><Refresh /></el-icon>
+            </el-button>
           </div>
         </div>
 
@@ -833,18 +824,30 @@ onMounted(() => {
 
     <LoginDialog v-model="loginOpen" @success="handleLoginSuccess" />
 
-    <!-- 返回顶部按钮 -->
-    <el-button
-      v-if="showBackToTop"
-      type="primary"
-      circle
-      class="tc-back-to-top"
-      :size="isMobile ? 'large' : 'default'"
-      @click="scrollToTop"
-      title="返回顶部"
-    >
-      <el-icon><ArrowUp /></el-icon>
-    </el-button>
+    <!-- 右下角固定按钮组 -->
+    <div class="tc-fixed-buttons">
+      <el-button
+        v-if="showBackToTop"
+        type="primary"
+        circle
+        class="tc-back-to-top"
+        :size="isMobile ? 'large' : 'default'"
+        @click="scrollToTop"
+        title="返回顶部"
+      >
+        <el-icon><ArrowUp /></el-icon>
+      </el-button>
+      <el-button
+        circle
+        class="tc-theme-toggle"
+        :size="isMobile ? 'large' : 'default'"
+        @click="mode = mode === 'dark' ? 'light' : 'dark'"
+        :title="mode === 'dark' ? '浅色模式' : '深色模式'"
+      >
+        <el-icon v-if="mode !== 'dark'"><Moon /></el-icon>
+        <el-icon v-else><Sunny /></el-icon>
+      </el-button>
+    </div>
   </el-container>
 </template>
 
@@ -995,21 +998,81 @@ onMounted(() => {
   }
 }
 
-.tc-mobile-menu {
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  gap: 8px;
+.tc-mobile-menu-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.tc-mobile-menu-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.tc-mobile-menu-content {
+  position: absolute;
+  top: 56px;
+  right: 12px;
+  width: 200px;
+  background: var(--el-bg-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  transform-origin: top right;
+  transform: scale(0.8) translateY(-10px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  max-height: calc(100vh - 70px);
+  overflow-y: auto;
+}
+
+.tc-mobile-menu-container.open .tc-mobile-menu-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tc-mobile-menu-container.open .tc-mobile-menu-content {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideDown {
+  0% {
+    transform: scale(0.8) translateY(-10px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 .tc-mobile-menu-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-radius: 12px;
+  padding: 14px 16px;
   transition: all 0.2s ease;
   cursor: pointer;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+
+.tc-mobile-menu-item:last-child {
+  border-bottom: none;
 }
 
 .tc-mobile-menu-item:hover {
@@ -1034,24 +1097,44 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.tc-back-to-top {
+.tc-fixed-buttons {
   position: fixed;
-  bottom: 24px;
   right: 24px;
+  bottom: 24px;
   z-index: 1000;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
 }
 
+.tc-theme-toggle,
+.tc-back-to-top {
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  min-width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tc-theme-toggle:hover,
 .tc-back-to-top:hover {
   transform: translateY(-4px);
   box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
 }
 
 @media (max-width: 768px) {
-  .tc-back-to-top {
-    bottom: 20px;
+  .tc-fixed-buttons {
     right: 20px;
+    bottom: 20px;
+    gap: 10px;
+  }
+  .tc-theme-toggle,
+  .tc-back-to-top {
+    min-width: 44px;
+    height: 44px;
   }
 }
 

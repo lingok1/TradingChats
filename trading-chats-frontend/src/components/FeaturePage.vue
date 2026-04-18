@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useTheme } from '../composables/useTheme'
-import { useIsMobile } from '../composables/useIsMobile'
 
 const { mode } = useTheme()
-const { isMobile } = useIsMobile()
 
 const emit = defineEmits(['switch-to-futures'])
 
-const isDarkMode = computed(() => mode === 'dark')
+const isDarkMode = computed(() => mode.value === 'dark')
 const isVisible = ref(false)
 
 onMounted(() => {
