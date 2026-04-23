@@ -13,14 +13,18 @@ import (
 )
 
 type AIResponseRepository struct {
-	collection *mongo.Collection
+	db *mongo.Database
 }
 
 func NewAIResponseRepository(db *mongo.Database) *AIResponseRepository {
-	return &AIResponseRepository{collection: db.Collection("ai_responses")}
+	return &AIResponseRepository{db: db}
 }
 
-func (r *AIResponseRepository) Create(ctx context.Context, response *models.AIResponse) error {
+func (r *AIResponseRepository) collection(tabTag string) *mongo.Collection {
+	return r.db.Collection(models.AIResponseCollectionName(tabTag))
+}
+
+func (r *AIResponseRepository) Create(ctx context.Context, tabTag string, response *models.AIResponse) error {
 	authCtx := models.GetAuthContext(ctx)
 	tenantID := models.ResolveTenantID(authCtx, response.TenantID)
 	if tenantID == "" {
@@ -29,7 +33,7 @@ func (r *AIResponseRepository) Create(ctx context.Context, response *models.AIRe
 	response.TenantID = tenantID
 	response.CreatedAt = utils.NowString()
 	response.UpdatedAt = utils.NowString()
-	result, err := r.collection.InsertOne(ctx, response)
+	result, err := r.collection(tabTag).InsertOne(ctx, response)
 	if err != nil {
 		return err
 	}
@@ -39,20 +43,20 @@ func (r *AIResponseRepository) Create(ctx context.Context, response *models.AIRe
 	return nil
 }
 
-func (r *AIResponseRepository) GetByID(ctx context.Context, id primitive.ObjectID) (*models.AIResponse, error) {
+func (r *AIResponseRepository) GetByID(ctx context.Context, tabTag string, id primitive.ObjectID) (*models.AIResponse, error) {
 	filter := bson.M{"_id": id}
 	applyTenantFilter(ctx, filter)
 	var response models.AIResponse
-	if err := r.collection.FindOne(ctx, filter).Decode(&response); err != nil {
+	if err := r.collection(tabTag).FindOne(ctx, filter).Decode(&response); err != nil {
 		return nil, err
 	}
 	return &response, nil
 }
 
-func (r *AIResponseRepository) GetByBatchID(ctx context.Context, batchID string) ([]models.AIResponse, error) {
+func (r *AIResponseRepository) GetByBatchID(ctx context.Context, tabTag string, batchID string) ([]models.AIResponse, error) {
 	filter := bson.M{"batch_id": batchID}
 	applyTenantFilter(ctx, filter)
-	cursor, err := r.collection.Find(ctx, filter)
+	cursor, err := r.collection(tabTag).Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -64,10 +68,33 @@ func (r *AIResponseRepository) GetByBatchID(ctx context.Context, batchID string)
 	return responses, nil
 }
 
-func (r *AIResponseRepository) GetAll(ctx context.Context) ([]models.AIResponse, error) {
+func (r *AIResponseRepository) GetCompletedByBatchID(ctx context.Context, tabTag string, batchID string) ([]models.AIResponse, error) {
+	filter := bson.M{
+		"batch_id": batchID,
+		"status":   "completed",
+	}
+	applyTenantFilter(ctx, filter)
+	opts := options.Find().SetSort(bson.D{
+		{Key: "completed_at", Value: -1},
+		{Key: "updated_at", Value: -1},
+		{Key: "_id", Value: -1},
+	})
+	cursor, err := r.collection(tabTag).Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var responses []models.AIResponse
+	if err := cursor.All(ctx, &responses); err != nil {
+		return nil, err
+	}
+	return responses, nil
+}
+
+func (r *AIResponseRepository) GetAll(ctx context.Context, tabTag string) ([]models.AIResponse, error) {
 	filter := bson.M{}
 	applyTenantFilter(ctx, filter)
-	cursor, err := r.collection.Find(ctx, filter)
+	cursor, err := r.collection(tabTag).Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -79,28 +106,46 @@ func (r *AIResponseRepository) GetAll(ctx context.Context) ([]models.AIResponse,
 	return responses, nil
 }
 
-func (r *AIResponseRepository) Update(ctx context.Context, response *models.AIResponse) error {
+func (r *AIResponseRepository) Update(ctx context.Context, tabTag string, response *models.AIResponse) error {
 	response.UpdatedAt = utils.NowString()
 	filter := bson.M{"_id": response.ID}
 	applyTenantFilter(ctx, filter)
-	_, err := r.collection.UpdateOne(ctx, filter, bson.M{"$set": response})
+	_, err := r.collection(tabTag).UpdateOne(ctx, filter, bson.M{"$set": response})
 	return err
 }
 
-func (r *AIResponseRepository) GetLatestSuccessfulBatchID(ctx context.Context) (string, error) {
-	filter := bson.M{"status": "completed"}
+func (r *AIResponseRepository) GetLatestBatchID(ctx context.Context, tabTag string) (string, error) {
+	filter := bson.M{}
 	applyTenantFilter(ctx, filter)
 	var response models.AIResponse
-	opts := options.FindOne().SetSort(bson.M{"created_at": -1})
-	if err := r.collection.FindOne(ctx, filter, opts).Decode(&response); err != nil {
+	opts := options.FindOne().SetSort(bson.D{
+		{Key: "created_at", Value: -1},
+		{Key: "_id", Value: -1},
+	})
+	if err := r.collection(tabTag).FindOne(ctx, filter, opts).Decode(&response); err != nil {
 		return "", err
 	}
 	return response.BatchID, nil
 }
 
-func (r *AIResponseRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
+func (r *AIResponseRepository) GetLatestCompletedBatchID(ctx context.Context, tabTag string) (string, error) {
+	filter := bson.M{"status": "completed"}
+	applyTenantFilter(ctx, filter)
+	var response models.AIResponse
+	opts := options.FindOne().SetSort(bson.D{
+		{Key: "completed_at", Value: -1},
+		{Key: "updated_at", Value: -1},
+		{Key: "_id", Value: -1},
+	})
+	if err := r.collection(tabTag).FindOne(ctx, filter, opts).Decode(&response); err != nil {
+		return "", err
+	}
+	return response.BatchID, nil
+}
+
+func (r *AIResponseRepository) Delete(ctx context.Context, tabTag string, id primitive.ObjectID) error {
 	filter := bson.M{"_id": id}
 	applyTenantFilter(ctx, filter)
-	_, err := r.collection.DeleteOne(ctx, filter)
+	_, err := r.collection(tabTag).DeleteOne(ctx, filter)
 	return err
 }

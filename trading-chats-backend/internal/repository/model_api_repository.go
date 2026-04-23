@@ -80,6 +80,46 @@ func (r *ModelAPIRepository) GetByProvider(ctx context.Context, provider string)
 	return configs, nil
 }
 
+func (r *ModelAPIRepository) GetEnabledByTabTag(ctx context.Context, tabTag string) ([]models.ModelAPIConfig, error) {
+	normalizedTab := models.NormalizeTabTag(tabTag)
+	filter := bson.M{
+		"tab_settings": bson.M{
+			"$elemMatch": bson.M{
+				"tab_tag": normalizedTab,
+				"enabled": true,
+			},
+		},
+	}
+	applyTenantFilter(ctx, filter)
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var configs []models.ModelAPIConfig
+	if err := cursor.All(ctx, &configs); err != nil {
+		return nil, err
+	}
+	return configs, nil
+}
+
+func (r *ModelAPIRepository) BackfillTabSettings(ctx context.Context, config *models.ModelAPIConfig) error {
+	if config == nil {
+		return nil
+	}
+
+	filter := bson.M{"_id": config.ID}
+	update := bson.M{
+		"$set": bson.M{
+			"tab_settings": config.TabSettings,
+			"updated_at":   utils.NowString(),
+		},
+	}
+	_, err := r.collection.UpdateOne(ctx, filter, update)
+	return err
+}
+
 func (r *ModelAPIRepository) Update(ctx context.Context, config *models.ModelAPIConfig) error {
 	config.UpdatedAt = utils.NowString()
 	filter := bson.M{"_id": config.ID}

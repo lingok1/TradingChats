@@ -1,84 +1,198 @@
-# MongoDB数据库表结构文档
+# MongoDB 数据库表结构文档
 
-## 1. 集合：prompt_templates（提示词模版）
+## 1. 集合：`prompt_templates`（提示词模板）
 
-| 字段名 | 数据类型 | 描述 | 索引 |
-|-------|---------|------|------|
-| `_id` | ObjectID | 文档唯一标识符 | 主键索引 |
-| `name` | String | 提示词模版名称 | 普通索引 |
-| `content` | String | 提示词内容 | - |
-| `tags` | Array<String> | 标签，如股票、期货、期权等 | 多键索引 |
+| 字段名 | 数据类型 | 说明 | 索引 |
+| --- | --- | --- | --- |
+| `_id` | ObjectID | 文档唯一标识 | 主键索引 |
+| `name` | String | 模板名称 | 普通索引 |
+| `content` | String | 模板内容 | - |
+| `tags` | Array<String> | 模板标签，例如期货、期权 | 多键索引 |
 | `created_at` | Date | 创建时间 | - |
 | `updated_at` | Date | 更新时间 | - |
 
-**用途**：存储AI提示词模版，支持按标签分类和检索。
+用途：存储 AI 提示词模板，支持按名称和标签管理。
 
-## 2. 集合：model_api_configs（模型与API配置）
+## 2. 集合：`model_api_configs`（模型与 API 配置）
 
-| 字段名 | 数据类型 | 描述 | 索引 |
-|-------|---------|------|------|
-| `_id` | ObjectID | 文档唯一标识符 | 主键索引 |
+| 字段名 | 数据类型 | 说明 | 索引 |
+| --- | --- | --- | --- |
+| `_id` | ObjectID | 文档唯一标识 | 主键索引 |
 | `name` | String | 配置名称 | 普通索引 |
-| `api_url` | String | API接口地址 | - |
-| `api_key` | String | API密钥 | - |
+| `api_url` | String | API 地址 | - |
+| `api_key` | String | API Key | - |
 | `models` | Array<String> | 模型名称列表 | - |
-| `provider` | String | 提供商，如anthropic、openai | 普通索引 |
+| `provider` | String | 提供商，例如 `openai`、`anthropic` | 普通索引 |
+| `tab_settings` | Array<Object> | Tab 页配置数组，每个对象包含 `tab_tag` 和 `enabled` | - |
 | `created_at` | Date | 创建时间 | - |
 | `updated_at` | Date | 更新时间 | - |
 
-**用途**：存储AI模型的API配置信息，支持不同提供商的配置管理。
+用途：存储 AI 模型连接配置，并通过 `tab_settings` 数组标记该配置归属的业务 Tab 以及是否启用。
 
-## 3. 集合：ai_responses（AI模型响应信息）
+## 3. 集合：`ai_responses`（期货 AI 响应）
 
-| 字段名 | 数据类型 | 描述 | 索引 |
-|-------|---------|------|------|
-| `_id` | ObjectID | 文档唯一标识符 | 主键索引 |
-| `batch_id` | String | 批次ID | 普通索引 |
-| `prompt` | String | 发送的提示词 | - |
-| `response` | String | AI模型的响应 | - |
-| `model_name` | String | 使用的模型名称 | 普通索引 |
+| 字段名 | 数据类型 | 说明 | 索引 |
+| --- | --- | --- | --- |
+| `_id` | ObjectID | 文档唯一标识 | 主键索引 |
+| `tenant_id` | String | 租户 ID | 普通索引 |
+| `batch_id` | String | 批次 ID | 普通索引 |
+| `prompt` | String | 发送给模型的提示词 | - |
+| `response` | String | 模型响应内容 | - |
+| `model_api_id` | ObjectID | 对应 `model_api_configs` 的 `_id` | 普通索引 |
+| `model_api_name` | String | 对应 `model_api_configs` 的 `name` | 普通索引 |
+| `model_name` | String | 模型名称 | 普通索引 |
 | `provider` | String | 提供商 | 普通索引 |
-| `status` | String | 任务状态：pending, completed, failed | 普通索引 |
+| `status` | String | 状态：`pending`、`completed`、`failed` | 普通索引 |
+| `error` | String | 错误信息 | - |
 | `created_at` | Date | 创建时间 | - |
 | `updated_at` | Date | 更新时间 | - |
 | `completed_at` | Date | 完成时间 | - |
 
-**用途**：存储AI模型的响应数据，支持按批次、状态和提供商检索。
+用途：存储期货 Tab 的模型生成结果。
 
-## 4. Redis存储：task_status（任务状态）
+## 4. 集合：`ai_responses_options`（期权 AI 响应）
 
-| 字段名 | 数据类型 | 描述 |
-|-------|---------|------|
-| `task_id` | String | 任务ID |
+字段结构与 `ai_responses` 完全一致：
+
+| 字段名 | 数据类型 | 说明 | 索引 |
+| --- | --- | --- | --- |
+| `_id` | ObjectID | 文档唯一标识 | 主键索引 |
+| `tenant_id` | String | 租户 ID | 普通索引 |
+| `batch_id` | String | 批次 ID | 普通索引 |
+| `prompt` | String | 发送给模型的提示词 | - |
+| `response` | String | 模型响应内容 | - |
+| `model_api_id` | ObjectID | 对应 `model_api_configs` 的 `_id` | 普通索引 |
+| `model_api_name` | String | 对应 `model_api_configs` 的 `name` | 普通索引 |
+| `model_name` | String | 模型名称 | 普通索引 |
+| `provider` | String | 提供商 | 普通索引 |
+| `status` | String | 状态：`pending`、`completed`、`failed` | 普通索引 |
+| `error` | String | 错误信息 | - |
+| `created_at` | Date | 创建时间 | - |
+| `updated_at` | Date | 更新时间 | - |
+| `completed_at` | Date | 完成时间 | - |
+
+用途：存储期权 Tab 的模型生成结果。
+
+## 5. 集合：`ai_responses_news`（新闻 AI 响应）
+
+字段结构与 `ai_responses` 完全一致：
+
+| 字段名 | 数据类型 | 说明 | 索引 |
+| --- | --- | --- | --- |
+| `_id` | ObjectID | 文档唯一标识 | 主键索引 |
+| `tenant_id` | String | 租户 ID | 普通索引 |
+| `batch_id` | String | 批次 ID | 普通索引 |
+| `prompt` | String | 发送给模型的提示词 | - |
+| `response` | String | 模型响应内容 | - |
+| `model_api_id` | ObjectID | 对应 `model_api_configs` 的 `_id` | 普通索引 |
+| `model_api_name` | String | 对应 `model_api_configs` 的 `name` | 普通索引 |
+| `model_name` | String | 模型名称 | 普通索引 |
+| `provider` | String | 提供商 | 普通索引 |
+| `status` | String | 状态：`pending`、`completed`、`failed` | 普通索引 |
+| `error` | String | 错误信息 | - |
+| `created_at` | Date | 创建时间 | - |
+| `updated_at` | Date | 更新时间 | - |
+| `completed_at` | Date | 完成时间 | - |
+
+用途：存储新闻 Tab 的模型生成结果。
+
+## 6. 集合：`ai_responses_position`（持仓 AI 响应）
+
+字段结构与 `ai_responses` 完全一致：
+
+| 字段名 | 数据类型 | 说明 | 索引 |
+| --- | --- | --- | --- |
+| `_id` | ObjectID | 文档唯一标识 | 主键索引 |
+| `tenant_id` | String | 租户 ID | 普通索引 |
+| `batch_id` | String | 批次 ID | 普通索引 |
+| `prompt` | String | 发送给模型的提示词 | - |
+| `response` | String | 模型响应内容 | - |
+| `model_api_id` | ObjectID | 对应 `model_api_configs` 的 `_id` | 普通索引 |
+| `model_api_name` | String | 对应 `model_api_configs` 的 `name` | 普通索引 |
+| `model_name` | String | 模型名称 | 普通索引 |
+| `provider` | String | 提供商 | 普通索引 |
+| `status` | String | 状态：`pending`、`completed`、`failed` | 普通索引 |
+| `error` | String | 错误信息 | - |
+| `created_at` | Date | 创建时间 | - |
+| `updated_at` | Date | 更新时间 | - |
+| `completed_at` | Date | 完成时间 | - |
+
+用途：存储持仓 Tab 的模型生成结果。
+
+## 7. Redis：`task_status`（任务状态）
+
+| 字段名 | 数据类型 | 说明 |
+| --- | --- | --- |
+| `task_id` | String | 任务 ID |
 | `status` | String | 任务状态 |
 | `created_at` | Date | 创建时间 |
 | `updated_at` | Date | 更新时间 |
 
-**用途**：在Redis中存储任务状态，用于实时跟踪任务执行情况。
+用途：存储临时任务执行状态，用于快速查询任务进度。
 
 ## 索引建议
 
-1. **prompt_templates集合**：
-   - `name`字段创建普通索引，加速按名称查询
-   - `tags`字段创建多键索引，加速按标签查询
+1. `prompt_templates`
+   - `name`
+   - `tags`
+2. `model_api_configs`
+   - `name`
+   - `provider`
+3. `ai_responses`
+   - `tenant_id`
+   - `batch_id`
+   - `status`
+   - `model_api_id`
+   - `model_api_name`
+   - 组合索引：`model_name + provider`
+4. `ai_responses_options`
+   - 与 `ai_responses` 相同
+5. `ai_responses_news`
+   - 与 `ai_responses` 相同
 
-2. **model_api_configs集合**：
-   - `name`字段创建普通索引，加速按名称查询
-   - `provider`字段创建普通索引，加速按提供商查询
-
-3. **ai_responses集合**：
-   - `batch_id`字段创建普通索引，加速按批次查询
-   - `status`字段创建普通索引，加速按状态查询
-   - `model_name`和`provider`字段创建组合索引，加速按模型和提供商查询
+6. `ai_responses_position`
+   - 与 `ai_responses` 相同
 
 ## 数据关系
 
-- `prompt_templates`与`ai_responses`：一对多关系，一个提示词模版可以生成多个AI响应
-- `model_api_configs`与`ai_responses`：一对多关系，一个模型配置可以产生多个AI响应
+- `prompt_templates` 与各类 `*_responses`：一对多。
+- `model_api_configs` 与各类 `*_responses`：一对多。
 
 ## 存储策略
 
-- **MongoDB**：存储主要业务数据，包括提示词模版、模型配置和AI响应
-- **Redis**：存储临时任务状态，提供快速的状态查询和更新
+- MongoDB：存储提示词模板、模型配置、各业务 Tab 的 AI 响应等业务数据。
+- Redis：存储临时任务状态，提供更快的状态读取能力。
 
-此数据库设计支持系统的核心功能，包括提示词管理、模型配置管理和AI响应存储，同时通过合理的索引设计提高查询性能。
+## Trade Plans
+
+集合名：`trade_plans`
+
+用途：
+- 存储期货、期权交易计划
+- 使用 `tab_tag` 区分 `futures` / `options`
+- 按 `tenant_id` 做租户隔离
+
+字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `_id` | ObjectId | 主键 |
+| `tenant_id` | String | 租户 ID |
+| `tab_tag` | String | `futures` 或 `options` |
+| `name` | String | 计划名称 |
+| `symbol` | String | 合约代码 |
+| `strategy` | String | 策略说明，如 `breakout_follow`、`buy_call` |
+| `direction` | String | 方向，如 `long`、`short`、`bullish`、`bearish` |
+| `entry_price` | Number | 入场价 |
+| `take_profit` | Number | 止盈价 |
+| `stop_loss` | Number | 止损价 |
+| `open_time` | String | 计划开仓时间 |
+| `close_time` | String | 计划平仓时间 |
+| `status` | String | `planned` / `active` / `closed` / `cancelled` |
+| `remark` | String | 备注 |
+| `created_at` | Date/String | 创建时间 |
+| `updated_at` | Date/String | 更新时间 |
+
+索引建议：
+- `tenant_id + tab_tag + status + updated_at`
+- `tenant_id + symbol + tab_tag`

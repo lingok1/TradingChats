@@ -17,7 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const signals = computed(() => extractSignalsFromMarkdown(props.markdown || ''))
-const open = ref(props.status !== 'failed' && signals.value.length > 0)
+const open = ref(props.status !== 'failed' && (props.markdown || '').trim().length > 0)
 
 const statusType = computed(() => {
   if (props.status === 'completed') return 'success'

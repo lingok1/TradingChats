@@ -1,18 +1,12 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
-export type ThemeMode = 'light' | 'dark' | 'system'
+export type ThemeMode = 'light' | 'dark'
 
 const storageKey = 'trading-chats-theme'
 
 export function useTheme() {
-  const mode = ref<ThemeMode>('system')
-  const systemDark = ref(false)
-
-  const isDark = computed(() => {
-    if (mode.value === 'dark') return true
-    if (mode.value === 'light') return false
-    return systemDark.value
-  })
+  const mode = ref<ThemeMode>('light')
+  const isDark = computed(() => mode.value === 'dark')
 
   function apply() {
     const root = document.documentElement
@@ -22,7 +16,7 @@ export function useTheme() {
 
   function load() {
     const v = localStorage.getItem(storageKey)
-    if (v === 'light' || v === 'dark' || v === 'system') mode.value = v
+    mode.value = v === 'dark' ? 'dark' : 'light'
   }
 
   function save() {
@@ -32,16 +26,10 @@ export function useTheme() {
   onMounted(() => {
     load()
 
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    systemDark.value = mq.matches
-    mq.addEventListener('change', (e) => {
-      systemDark.value = e.matches
-    })
-
     apply()
   })
 
-  watch([mode, systemDark], () => {
+  watch(mode, () => {
     save()
     apply()
   })

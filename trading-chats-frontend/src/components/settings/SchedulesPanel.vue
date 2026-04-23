@@ -1,30 +1,136 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Edit } from '@element-plus/icons-vue'
-import type { ScheduleConfig, ScheduleLog, PromptTemplate } from '../../api/types'
-import { createSchedule, deleteSchedule, getScheduleLogs, getSchedules, updateSchedule, updateScheduleStatus } from '../../api/schedules'
+import { Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import type { PromptTemplate, ScheduleConfig, ScheduleLog, TabTag } from '../../api/types'
+import {
+  createSchedule,
+  deleteSchedule,
+  getScheduleLogs,
+  getSchedules,
+  updateSchedule,
+  updateScheduleStatus,
+} from '../../api/schedules'
 import { getPromptTemplates } from '../../api/promptTemplates'
 import { asTimeString } from '../../utils/time'
+import { highlightKeyword, matchesKeyword } from '../../utils/search'
 
 const props = defineProps<{
   mobile?: boolean
 }>()
+
+const PAGE_SIZES = [5, 10, 20, 50]
+
+const TEXT = {
+  title: '定时任务',
+  refresh: '刷新',
+  create: '新建',
+  edit: '编辑',
+  logs: '日志',
+  delete: '删除',
+  save: '保存',
+  cancel: '取消',
+  name: '名称',
+  cron: 'Cron 表达式',
+  template: '提示模板',
+  tab: 'Tab 页签',
+  status: '状态',
+  updatedAt: '更新时间',
+  actions: '操作',
+  active: '启用',
+  paused: '暂停',
+  createTitle: '新建定时任务',
+  editTitle: '编辑定时任务',
+  createSuccess: '已创建',
+  updateSuccess: '已更新',
+  deleteSuccess: '已删除',
+  toggleActiveSuccess: '已启用',
+  togglePausedSuccess: '已暂停',
+  validation: '请完整填写名称、Cron、提示模板和 Tab 页签',
+  deleteConfirmPrefix: '确认删除任务“',
+  deleteConfirmSuffix: '”？',
+  cronPlaceholder: '例如：0 */10 * * * *',
+  logTitle: '执行日志',
+  batchID: '批次 ID',
+  error: '错误',
+  executedAt: '执行时间',
+  totalLogs: '共',
+  totalLogsSuffix: '条',
+  tabFutures: '期货',
+  tabOptions: '期权',
+  tabNews: '新闻',
+  tabPosition: '持仓',
+} as const
+
+const tabOptions: Array<{ label: string; value: TabTag }> = [
+  { label: TEXT.tabFutures, value: 'futures' },
+  { label: TEXT.tabOptions, value: 'options' },
+  { label: TEXT.tabNews, value: 'news' },
+  { label: TEXT.tabPosition, value: 'position' },
+]
 
 const loading = ref(false)
 const toggleLoadingMap = reactive<Record<string, boolean>>({})
 const list = ref<ScheduleConfig[]>([])
 const promptTemplates = ref<PromptTemplate[]>([])
 const templatesLoading = ref(false)
+const inputKeyword = ref('')
+const appliedKeyword = ref('')
 
 const currentPage = ref(1)
 const pageSize = ref(10)
+const createOpen = ref(false)
+const currentEditId = ref<string>('')
+
+const logsOpen = ref(false)
+const logsLoading = ref(false)
+const logs = ref<ScheduleLog[]>([])
+const logsCurrentPage = ref(1)
+const logsPageSize = ref(10)
+const logsFor = ref<ScheduleConfig | null>(null)
+
+const form = reactive({
+  name: '',
+  cron_expr: '',
+  template_id: '',
+  tab_tag: 'futures' as TabTag,
+  status: 'paused' as 'active' | 'paused',
+})
+
+const filteredList = computed(() => {
+  if (!appliedKeyword.value) {
+    return list.value
+  }
+
+  return list.value.filter((item) =>
+    matchesKeyword(
+      [
+        item.name,
+        item.cron_expr,
+        item.template_id,
+        getTabLabel(item.tab_tag),
+        item.status,
+        asTimeString(item.updated_at || item.created_at),
+      ],
+      appliedKeyword.value,
+    ),
+  )
+})
 
 const currentList = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return list.value.slice(start, end)
+  return filteredList.value.slice(start, start + pageSize.value)
 })
+
+const pagedLogs = computed(() => {
+  const start = (logsCurrentPage.value - 1) * logsPageSize.value
+  return logs.value.slice(start, start + logsPageSize.value)
+})
+
+const dialogTitle = computed(() => (currentEditId.value ? TEXT.editTitle : TEXT.createTitle))
+const paginationLayout = computed(() =>
+  props.mobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper',
+)
 
 function handleSizeChange(size: number) {
   pageSize.value = size
@@ -35,52 +141,67 @@ function handleCurrentChange(current: number) {
   currentPage.value = current
 }
 
-const createOpen = ref(false)
+function runSearch() {
+  appliedKeyword.value = inputKeyword.value.trim()
+  currentPage.value = 1
+}
 
-const logsOpen = ref(false)
-const logsLoading = ref(false)
-const logs = ref<ScheduleLog[]>([])
-const logsCurrentPage = ref(1)
-const logsPageSize = ref(10)
-const logsFor = ref<ScheduleConfig | null>(null)
-const currentEditId = ref<string>('')
+function clearSearch() {
+  inputKeyword.value = ''
+  appliedKeyword.value = ''
+  currentPage.value = 1
+}
 
-const pagedLogs = computed(() => {
-  const start = (logsCurrentPage.value - 1) * logsPageSize.value
-  const end = start + logsPageSize.value
-  return logs.value.slice(start, end)
-})
+function highlightText(value: string) {
+  return highlightKeyword(value, appliedKeyword.value)
+}
 
-const form = reactive({
-  name: '',
-  cron_expr: '',
-  template_id: '',
-  status: 'paused' as 'active' | 'paused',
-})
+function handleLogsSizeChange(size: number) {
+  logsPageSize.value = size
+  logsCurrentPage.value = 1
+}
 
-const createTitle = computed(() => currentEditId.value ? '编辑定时任务' : '新建定时任务')
-
-async function fetchPromptTemplates() {
-  templatesLoading.value = true
-  try {
-    promptTemplates.value = await getPromptTemplates()
-    if (promptTemplates.value.length > 0 && !form.template_id && promptTemplates.value[0].id) {
-      form.template_id = promptTemplates.value[0].id
-    }
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
-  } finally {
-    templatesLoading.value = false
-  }
+function handleLogsCurrentChange(current: number) {
+  logsCurrentPage.value = current
 }
 
 function resetForm() {
   form.name = ''
   form.cron_expr = ''
-  form.template_id = ''
+  form.tab_tag = 'futures'
+  form.template_id = promptTemplates.value[0]?.id ?? ''
   form.status = 'paused'
-  if (promptTemplates.value.length > 0 && promptTemplates.value[0].id) {
-    form.template_id = promptTemplates.value[0].id
+  currentEditId.value = ''
+}
+
+function getTabLabel(tab?: string) {
+  return tabOptions.find((item) => item.value === tab)?.label ?? (tab || 'futures')
+}
+
+function formatDateTime(value: string | number | Date | null | undefined): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  const second = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+}
+
+async function fetchPromptTemplates() {
+  templatesLoading.value = true
+  try {
+    promptTemplates.value = await getPromptTemplates()
+    if (!form.template_id) {
+      form.template_id = promptTemplates.value[0]?.id ?? ''
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
+  } finally {
+    templatesLoading.value = false
   }
 }
 
@@ -88,12 +209,12 @@ async function refresh() {
   loading.value = true
   try {
     list.value = await getSchedules()
-    const maxPage = Math.max(1, Math.ceil(list.value.length / pageSize.value))
+    const maxPage = Math.max(1, Math.ceil(filteredList.value.length / pageSize.value))
     if (currentPage.value > maxPage) {
       currentPage.value = maxPage
     }
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     loading.value = false
   }
@@ -101,28 +222,30 @@ async function refresh() {
 
 function openCreate() {
   resetForm()
-  currentEditId.value = ''
   createOpen.value = true
 }
 
 function openEdit(row: ScheduleConfig) {
-  currentEditId.value = row.id || ''
-  form.name = row.name || ''
-  form.cron_expr = row.cron_expr || ''
-  form.template_id = row.template_id || ''
-  form.status = (row.status || 'paused') as 'active' | 'paused'
+  currentEditId.value = row.id ?? ''
+  form.name = row.name ?? ''
+  form.cron_expr = row.cron_expr ?? ''
+  form.template_id = row.template_id ?? ''
+  form.tab_tag = row.tab_tag ?? 'futures'
+  form.status = row.status ?? 'paused'
   createOpen.value = true
 }
 
-async function submitCreate() {
+async function submit() {
   const body = {
     name: form.name.trim(),
     cron_expr: form.cron_expr.trim(),
     template_id: form.template_id.trim(),
+    tab_tag: form.tab_tag,
     status: form.status,
   }
-  if (!body.name || !body.cron_expr || !body.template_id) {
-    ElMessage.warning('请填写名称、cron 表达式、template_id')
+
+  if (!body.name || !body.cron_expr || !body.template_id || !body.tab_tag) {
+    ElMessage.warning(TEXT.validation)
     return
   }
 
@@ -130,91 +253,99 @@ async function submitCreate() {
   try {
     if (currentEditId.value) {
       await updateSchedule(currentEditId.value, body)
-      ElMessage.success('已更新')
+      ElMessage.success(TEXT.updateSuccess)
     } else {
       await createSchedule(body)
-      ElMessage.success('已创建')
+      ElMessage.success(TEXT.createSuccess)
     }
     createOpen.value = false
     currentPage.value = 1
     await refresh()
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     loading.value = false
   }
 }
 
 async function remove(row: ScheduleConfig) {
-  const id = row.id
-  if (!id) return
+  if (!row.id) return
+
   try {
-    await ElMessageBox.confirm(`确认删除任务「${row.name}」？`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(
+      `${TEXT.deleteConfirmPrefix}${row.name}${TEXT.deleteConfirmSuffix}`,
+      TEXT.title,
+      { type: 'warning' },
+    )
   } catch {
     return
   }
+
   loading.value = true
   try {
-    await deleteSchedule(id)
-    ElMessage.success('已删除')
+    await deleteSchedule(row.id)
+    ElMessage.success(TEXT.deleteSuccess)
     await refresh()
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     loading.value = false
   }
 }
 
 async function toggleStatus(row: ScheduleConfig) {
-  const id = row.id
-  if (!id) return
-  const next = row.status === 'active' ? 'paused' : 'active'
-  toggleLoadingMap[id] = true
+  if (!row.id) return
+
+  const nextStatus = row.status === 'active' ? 'paused' : 'active'
+  toggleLoadingMap[row.id] = true
   try {
-    await updateScheduleStatus(id, next)
-    ElMessage.success(next === 'active' ? '已启用' : '已暂停')
+    await updateScheduleStatus(row.id, nextStatus)
+    ElMessage.success(nextStatus === 'active' ? TEXT.toggleActiveSuccess : TEXT.togglePausedSuccess)
     await refresh()
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
-    toggleLoadingMap[id] = false
+    toggleLoadingMap[row.id] = false
   }
 }
 
-function formatDateTime(v: string | number | Date | null | undefined): string {
-  if (!v) return ''
-  const d = new Date(v)
-  if (isNaN(d.getTime())) return String(v)
-  const Y = d.getFullYear()
-  const M = String(d.getMonth() + 1).padStart(2, '0')
-  const D = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const m = String(d.getMinutes()).padStart(2, '0')
-  const s = String(d.getSeconds()).padStart(2, '0')
-  return `${Y}-${M}-${D} ${h}:${m}:${s}`
-}
-
 async function openLogs(row: ScheduleConfig) {
-  const id = row.id
-  if (!id) return
+  if (!row.id) return
+
   logsFor.value = row
   logsOpen.value = true
   logsLoading.value = true
   logsCurrentPage.value = 1
+
   try {
-    const list = await getScheduleLogs(id)
-    logs.value = (list || []).sort((a, b) => {
-      const ta = a.executed_at ? new Date(a.executed_at as string | number).getTime() : 0
-      const tb = b.executed_at ? new Date(b.executed_at as string | number).getTime() : 0
-      return tb - ta
+    const items = await getScheduleLogs(row.id)
+    logs.value = [...(items || [])].sort((left, right) => {
+      const leftTime = left.executed_at ? new Date(left.executed_at as string | number).getTime() : 0
+      const rightTime = right.executed_at ? new Date(right.executed_at as string | number).getTime() : 0
+      return rightTime - leftTime
     })
-  } catch (e) {
+  } catch (error) {
     logs.value = []
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     logsLoading.value = false
   }
 }
+
+function syncTemplateSelection() {
+  const currentTemplateExists = promptTemplates.value.some((item) => item.id === form.template_id)
+  if (currentTemplateExists) {
+    return
+  }
+  form.template_id = promptTemplates.value[0]?.id ?? ''
+}
+
+watch(
+  () => promptTemplates.value,
+  () => {
+    syncTemplateSelection()
+  },
+)
 
 onMounted(async () => {
   await fetchPromptTemplates()
@@ -224,40 +355,76 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
-      <div style="font-weight: 600">定时任务</div>
-      <el-space :direction="mobile ? 'vertical' : 'horizontal'" :size="mobile ? 8 : 12">
-        <el-button size="small" @click="refresh" :loading="loading" title="刷新">
-          <template #icon><Refresh /></template>
-          刷新
+    <div class="toolbar">
+      <div class="toolbar-title">{{ TEXT.title }}</div>
+      <el-space :direction="props.mobile ? 'vertical' : 'horizontal'" :size="props.mobile ? 8 : 12">
+        <el-input
+          v-model="inputKeyword"
+          clearable
+          placeholder="搜索当前任务页"
+          :style="{ width: props.mobile ? '100%' : '220px' }"
+          @keyup.enter="runSearch"
+        />
+        <el-button size="small" title="搜索" @click="runSearch">
+          <template #icon><Search /></template>
+          搜索
         </el-button>
-        <el-button size="small" type="primary" @click="openCreate" title="新建">
+        <el-button size="small" title="清空搜索" @click="clearSearch">清空</el-button>
+        <el-button size="small" type="primary" :title="TEXT.create" @click="openCreate">
           <template #icon><Plus /></template>
-          新建
+          {{ TEXT.create }}
+        </el-button>
+        <el-button size="small" :loading="loading" :title="TEXT.refresh" @click="refresh">
+          <template #icon><Refresh /></template>
+          {{ TEXT.refresh }}
         </el-button>
       </el-space>
     </div>
 
-    <div style="max-height: 400px; overflow-y: auto; padding-right: 8px; margin-bottom: 12px;">
-      <el-table :data="currentList" style="width: 100%; margin-top: 12px" size="small" :loading="loading">
-        <el-table-column prop="name" label="名称" :min-width="mobile ? 100 : 140" />
-        <el-table-column prop="cron_expr" label="Cron" :min-width="mobile ? 120 : 150" show-overflow-tooltip />
-        <el-table-column prop="template_id" label="template_id" :min-width="mobile ? 120 : 160" show-overflow-tooltip v-if="!mobile" />
-        <el-table-column prop="status" label="状态" :width="mobile ? 90 : 110">
+    <div class="table-wrap">
+      <el-table :data="currentList" size="small" :loading="loading" style="width: 100%; margin-top: 12px">
+        <el-table-column :label="TEXT.name" :min-width="props.mobile ? 100 : 140">
           <template #default="scope">
-            <el-tag size="small" :type="scope.row.status === 'active' ? 'success' : 'info'">
-              {{ scope.row.status }}
+            <span v-html="highlightText(scope.row.name)" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="TEXT.cron" :min-width="props.mobile ? 120 : 150" show-overflow-tooltip>
+          <template #default="scope">
+            <span v-html="highlightText(scope.row.cron_expr)" />
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-if="!props.mobile"
+          :label="TEXT.template"
+          :min-width="160"
+          show-overflow-tooltip
+        >
+          <template #default="scope">
+            <span v-html="highlightText(scope.row.template_id)" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="TEXT.tab" :width="props.mobile ? 90 : 110">
+          <template #default="scope">
+            <el-tag size="small" type="warning">
+              <span v-html="highlightText(getTabLabel(scope.row.tab_tag))" />
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="更新时间" :width="mobile ? 120 : 150">
+        <el-table-column :label="TEXT.status" :width="props.mobile ? 90 : 110">
           <template #default="scope">
-            <span>{{ asTimeString(scope.row.updated_at || scope.row.created_at) }}</span>
+            <el-tag size="small" :type="scope.row.status === 'active' ? 'success' : 'info'">
+              <span v-html="highlightText(scope.row.status)" />
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" :width="mobile ? 100 : 240" fixed="right">
+        <el-table-column :label="TEXT.updatedAt" :width="props.mobile ? 120 : 150">
           <template #default="scope">
-            <el-space :direction="mobile ? 'vertical' : 'horizontal'" :size="4">
+            <span v-html="highlightText(asTimeString(scope.row.updated_at || scope.row.created_at))" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="TEXT.actions" :width="props.mobile ? 100 : 240" fixed="right">
+          <template #default="scope">
+            <el-space :direction="props.mobile ? 'vertical' : 'horizontal'" :size="4">
               <el-button
                 size="small"
                 text
@@ -265,16 +432,18 @@ onMounted(async () => {
                 :loading="toggleLoadingMap[scope.row.id!]"
                 @click="toggleStatus(scope.row)"
               >
-                {{ scope.row.status === 'active' ? '暂停' : '启用' }}
+                {{ scope.row.status === 'active' ? TEXT.paused : TEXT.active }}
               </el-button>
-              <el-button size="small" text type="info" @click="openLogs(scope.row)" v-if="!mobile">日志</el-button>
-              <el-button size="small" text type="warning" @click="openEdit(scope.row)" v-if="!mobile">
-                <template #icon>
-                  <Edit />
-                </template>
-                编辑
+              <el-button v-if="!props.mobile" size="small" text type="info" @click="openLogs(scope.row)">
+                {{ TEXT.logs }}
               </el-button>
-              <el-button size="small" text type="danger" @click="remove(scope.row)">删除</el-button>
+              <el-button v-if="!props.mobile" size="small" text type="warning" @click="openEdit(scope.row)">
+                <template #icon><Edit /></template>
+                {{ TEXT.edit }}
+              </el-button>
+              <el-button size="small" text type="danger" @click="remove(scope.row)">
+                {{ TEXT.delete }}
+              </el-button>
             </el-space>
           </template>
         </el-table-column>
@@ -282,28 +451,28 @@ onMounted(async () => {
     </div>
 
     <el-pagination
+      v-if="filteredList.length > 2"
       v-model:current-page="currentPage"
       v-model:page-size="pageSize"
-      :page-sizes="[5, 10, 20, 50]"
-      :small="mobile"
-      :layout="mobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper'"
-      :total="list.length"
-      :hide-on-single-page="true"
+      :page-sizes="PAGE_SIZES"
+      :small="props.mobile"
+      :layout="paginationLayout"
+      :total="filteredList.length"
       @size-change="handleSizeChange"
       @current-change="handleCurrentChange"
-      style="margin-top: 12px; justify-content: center"
+      class="pagination"
     />
 
-    <el-dialog v-model="createOpen" :title="createTitle" :width="mobile ? '90%' : '720px'" @closed="resetForm">
+    <el-dialog v-model="createOpen" :title="dialogTitle" :width="props.mobile ? '90%' : '720px'" @closed="resetForm">
       <el-form label-position="top">
-        <el-form-item label="名称">
+        <el-form-item :label="TEXT.name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="Cron 表达式">
-          <el-input v-model="form.cron_expr" placeholder="例如：*/10 * * * * *（秒级）" />
+        <el-form-item :label="TEXT.cron">
+          <el-input v-model="form.cron_expr" :placeholder="TEXT.cronPlaceholder" />
         </el-form-item>
-        <el-form-item label="template_id">
-          <el-select v-model="form.template_id" placeholder="请选择提示模板" :loading="templatesLoading">
+        <el-form-item :label="TEXT.template">
+          <el-select v-model="form.template_id" :loading="templatesLoading" style="width: 100%">
             <el-option
               v-for="template in promptTemplates"
               :key="template.id"
@@ -312,55 +481,106 @@ onMounted(async () => {
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="初始状态">
-          <el-radio-group v-model="form.status" :size="mobile ? 'small' : 'default'">
-            <el-radio-button label="active">启用</el-radio-button>
-            <el-radio-button label="paused">暂停</el-radio-button>
+        <el-form-item :label="TEXT.tab">
+          <el-select v-model="form.tab_tag" style="width: 100%">
+            <el-option v-for="item in tabOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="TEXT.status">
+          <el-radio-group v-model="form.status" :size="props.mobile ? 'small' : 'default'">
+            <el-radio-button label="active">{{ TEXT.active }}</el-radio-button>
+            <el-radio-button label="paused">{{ TEXT.paused }}</el-radio-button>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-space>
-          <el-button @click="createOpen = false">取消</el-button>
-          <el-button type="primary" :loading="loading" @click="submitCreate">创建</el-button>
+          <el-button @click="createOpen = false">{{ TEXT.cancel }}</el-button>
+          <el-button type="primary" :loading="loading" @click="submit">{{ TEXT.save }}</el-button>
         </el-space>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="logsOpen" title="执行日志" :width="mobile ? '90%' : '820px'">
+    <el-dialog v-model="logsOpen" :title="TEXT.logTitle" :width="props.mobile ? '90%' : '820px'">
       <template #header>
-        <div style="font-weight: 600">执行日志</div>
+        <div class="logs-title">
+          {{ TEXT.logTitle }}<span v-if="logsFor?.tab_tag"> / {{ getTabLabel(logsFor.tab_tag) }}</span>
+        </div>
       </template>
 
-      <el-table :data="pagedLogs" style="width: 100%" size="small" :loading="logsLoading">
-        <el-table-column label="序号" width="60" align="center">
+      <el-table :data="pagedLogs" size="small" :loading="logsLoading" style="width: 100%">
+        <el-table-column label="#" width="60" align="center">
           <template #default="scope">
             {{ (logsCurrentPage - 1) * logsPageSize + scope.$index + 1 }}
           </template>
         </el-table-column>
-        <el-table-column label="时间" :width="mobile ? 140 : 180">
+        <el-table-column :label="TEXT.executedAt" :width="props.mobile ? 140 : 180">
           <template #default="scope">
-            <span>{{ formatDateTime(scope.row.executed_at) }}</span>
+            <span>{{ formatDateTime(scope.row.executed_at as string | number | Date | null | undefined) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" :width="mobile ? 90 : 110" />
-        <el-table-column prop="batch_id" label="batch_id" :min-width="mobile ? 120 : 220" show-overflow-tooltip />
-        <el-table-column prop="error" label="错误" :min-width="mobile ? 120 : 240" show-overflow-tooltip />
+        <el-table-column prop="status" :label="TEXT.status" :width="props.mobile ? 90 : 110" />
+        <el-table-column prop="batch_id" :label="TEXT.batchID" :min-width="props.mobile ? 120 : 220" show-overflow-tooltip />
+        <el-table-column prop="error" :label="TEXT.error" :min-width="props.mobile ? 120 : 240" show-overflow-tooltip />
       </el-table>
 
-      <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center">
-        <div style="font-size: 13px; color: var(--el-text-color-secondary)">
-          共 {{ logs.length }} 条
-        </div>
+      <div class="logs-footer">
+        <div class="logs-total">{{ TEXT.totalLogs }} {{ logs.length }} {{ TEXT.totalLogsSuffix }}</div>
         <el-pagination
           v-model:current-page="logsCurrentPage"
           v-model:page-size="logsPageSize"
+          :page-sizes="PAGE_SIZES"
           :total="logs.length"
-          layout="prev, pager, next"
-          size="small"
+          :small="props.mobile"
+          :layout="paginationLayout"
           :hide-on-single-page="true"
+          @size-change="handleLogsSizeChange"
+          @current-change="handleLogsCurrentChange"
         />
       </div>
     </el-dialog>
   </div>
 </template>
+
+<style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar-title {
+  font-weight: 600;
+}
+
+.table-wrap {
+  max-height: 400px;
+  margin-bottom: 12px;
+  padding-right: 8px;
+  overflow-y: auto;
+}
+
+.pagination {
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.logs-title {
+  font-weight: 600;
+}
+
+.logs-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  gap: 12px;
+}
+
+.logs-total {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+</style>

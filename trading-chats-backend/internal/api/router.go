@@ -17,6 +17,8 @@ func SetupRoutes(
 	promptTemplateService *service.PromptTemplateService,
 	modelAPIService *service.ModelAPIService,
 	aiResponseService *service.AIResponseService,
+	aiResponseEventService *service.AIResponseEventService,
+	tradePlanService *service.TradePlanService,
 	scheduleService *service.ScheduleService,
 	systemConfigService service.SystemConfigService,
 	authService *service.AuthService,
@@ -34,7 +36,8 @@ func SetupRoutes(
 
 	promptTemplateHandler := NewPromptTemplateHandler(promptTemplateService)
 	modelAPIHandler := NewModelAPIHandler(modelAPIService)
-	aiResponseHandler := NewAIResponseHandler(aiResponseService)
+	aiResponseHandler := NewAIResponseHandler(aiResponseService, aiResponseEventService)
+	tradePlanHandler := NewTradePlanHandler(tradePlanService)
 	scheduleHandler := NewScheduleHandler(scheduleService)
 	systemConfigHandler := NewSystemConfigHandler(systemConfigService)
 	authHandler := NewAuthHandler(authService)
@@ -68,8 +71,15 @@ func SetupRoutes(
 		{
 			aiResponses.GET("", aiResponseHandler.GetAllAIResponses)
 			aiResponses.GET("/batch", aiResponseHandler.GetAIResponsesByBatchID)
-			aiResponses.GET("/latest", aiResponseHandler.GetLatestSuccessfulBatch)
+			aiResponses.GET("/events", aiResponseHandler.StreamAIResponseEvents)
+			aiResponses.GET("/latest", aiResponseHandler.GetLatestBatch)
 			aiResponses.GET("/:id", aiResponseHandler.GetAIResponseByID)
+		}
+
+		tradePlans := api.Group("/trade-plans")
+		{
+			tradePlans.GET("", AuthMiddleware(authService), tradePlanHandler.GetTradePlans)
+			tradePlans.GET("/:id", AuthMiddleware(authService), tradePlanHandler.GetTradePlanByID)
 		}
 
 		schedules := api.Group("/schedules")
@@ -100,6 +110,10 @@ func SetupRoutes(
 
 		protected.POST("/ai-responses/generate", RequireRoles(models.RoleAdmin, models.RoleTenant), aiResponseHandler.GenerateBatchAIResponses)
 
+		protected.POST("/trade-plans", RequireRoles(models.RoleAdmin, models.RoleTenant), tradePlanHandler.CreateTradePlan)
+		protected.PUT("/trade-plans/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), tradePlanHandler.UpdateTradePlan)
+		protected.DELETE("/trade-plans/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), tradePlanHandler.DeleteTradePlan)
+
 		protected.POST("/schedules", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.CreateConfig)
 		protected.PUT("/schedules/:id", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.UpdateConfig)
 		protected.PUT("/schedules/status", RequireRoles(models.RoleAdmin, models.RoleTenant), scheduleHandler.UpdateConfigStatus)
@@ -115,13 +129,15 @@ func SetupRouter(
 	promptTemplateService *service.PromptTemplateService,
 	modelAPIService *service.ModelAPIService,
 	aiResponseService *service.AIResponseService,
+	aiResponseEventService *service.AIResponseEventService,
+	tradePlanService *service.TradePlanService,
 	scheduleService *service.ScheduleService,
 	systemConfigService service.SystemConfigService,
 	authService *service.AuthService,
 	swaggerConfig *config.SwaggerConfig,
 ) *gin.Engine {
 	r := gin.Default()
-	SetupRoutes(r, promptTemplateService, modelAPIService, aiResponseService, scheduleService, systemConfigService, authService)
+	SetupRoutes(r, promptTemplateService, modelAPIService, aiResponseService, aiResponseEventService, tradePlanService, scheduleService, systemConfigService, authService)
 
 	r.GET("/swagger/*any", SwaggerBasicAuth(swaggerConfig), ginSwagger.WrapHandler(
 		swaggerFiles.Handler,

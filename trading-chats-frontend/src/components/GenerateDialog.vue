@@ -24,12 +24,19 @@ const open = computed({
 
 const form = reactive<GenerateAIRequest>({
   template_id: '',
+  tab_tag: 'futures',
   param1: '',
   param2: '',
 })
 
 const templates = ref<PromptTemplate[]>([])
 const templatesLoading = ref(false)
+const tabOptions: Array<{ label: string; value: NonNullable<GenerateAIRequest['tab_tag']> }> = [
+  { label: '期货', value: 'futures' },
+  { label: '期权', value: 'options' },
+  { label: '新闻', value: 'news' },
+  { label: '持仓', value: 'position' },
+]
 
 async function loadTemplates() {
   templatesLoading.value = true
@@ -52,6 +59,7 @@ watch(
       loadTemplates()
     } else {
       form.template_id = ''
+      form.tab_tag = 'futures'
       form.param1 = ''
       form.param2 = ''
     }
@@ -87,6 +95,16 @@ onMounted(() => {
               </span>
             </div>
           </el-option>
+        </el-select>
+      </el-form-item>
+      <el-form-item label="tab">
+        <el-select v-model="form.tab_tag" placeholder="select tab" style="width: 100%">
+          <el-option
+            v-for="item in tabOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
         </el-select>
       </el-form-item>
     </el-form>

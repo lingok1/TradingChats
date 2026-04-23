@@ -1,95 +1,141 @@
-
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Moon, Sunny, DataAnalysis, Position, Notification, Refresh, Menu, ArrowUp, Calendar, PieChart, InfoFilled, User } from '@element-plus/icons-vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  Moon,
+  Sunny,
+  DataAnalysis,
+  Position,
+  Notification,
+  Refresh,
+  Menu,
+  ArrowUp,
+  Calendar,
+  PieChart,
+  InfoFilled,
+  User,
+} from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import type { AIResponse, NewsItem } from './api/types'
+import type { AIResponse, AIResponseEvent, TabTag } from './api/types'
+import { getAIResponseEventsUrl, getLatestAIResponses } from './api/aiResponses'
 import { getSystemConfig } from './api/systemConfig'
-import { getLatestAIResponses } from './api/aiResponses'
 import { useIsMobile } from './composables/useIsMobile'
 import { useTheme } from './composables/useTheme'
+import { hasRenderableMarkdownTable } from './utils/markdownTable'
 import { asTimeString } from './utils/time'
 import type { SignalRow } from './utils/markdownTable'
-import { hasRenderableMarkdownTable } from './utils/markdownTable'
 import ModelPanel from './components/ModelPanel.vue'
 import SettingsDrawer from './components/SettingsDrawer.vue'
 import SignalDetailDrawer from './components/SignalDetailDrawer.vue'
 import LoginDialog from './components/LoginDialog.vue'
-import MarkdownRenderer from './components/MarkdownRenderer.vue'
-import NewsList from './components/NewsList.vue'
-import NewsDetailDrawer from './components/NewsDetailDrawer.vue'
-import PositionPage from './components/PositionPage.vue'
 import FeaturePage from './components/FeaturePage.vue'
+import TradePlansPage from './components/TradePlansPage.vue'
+
+type AppTab = TabTag | 'plan' | 'about'
+
+const TAB_META: Record<AppTab, { title: string; description: string }> = {
+  futures: {
+    title: '期货',
+    description: '展示期货页最近一批 AI 分析结果。',
+  },
+  options: {
+    title: '期权',
+    description: '展示期权页最近一批 AI 分析结果。',
+  },
+  news: {
+    title: '新闻',
+    description: '展示新闻页最近一批 AI 分析结果。',
+  },
+  plan: {
+    title: '计划',
+    description: '计划管理页暂未接入新的数据面板。',
+  },
+  position: {
+    title: '持仓',
+    description: '展示持仓页最近一批 AI 分析结果。',
+  },
+  about: {
+    title: '关于',
+    description: '系统说明与功能介绍。',
+  },
+}
+
+const NAV_TABS: AppTab[] = ['futures', 'options', 'news', 'plan', 'position', 'about']
+const ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'news', 'position']
+const authStorageKey = 'tc_auth'
+const scrollThreshold = 200
+const eventReconnectDelay = 3000
+const eventRefreshDelay = 500
 
 const { isMobile } = useIsMobile()
-const { mode } = useTheme()
+const { mode, isDark } = useTheme()
 
-const activeTab = ref('futures')
+const activeTab = ref<AppTab>('futures')
+const mobileMenuOpen = ref(false)
 const startX = ref(0)
 const startY = ref(0)
 const endX = ref(0)
 const endY = ref(0)
+
 const loginOpen = ref(false)
 const accessToken = ref('')
 const refreshToken = ref('')
 const currentUsername = ref('')
-const mobileMenuOpen = ref(false)
 
-// 返回顶部按钮相关
 const showBackToTop = ref(false)
-const scrollThreshold = 200
+const settingsOpen = ref(false)
+const loading = ref(false)
+const errorText = ref('')
+const responses = ref<AIResponse[]>([])
+
+const systemTitle = ref('Trading Chats')
+const systemLogo = ref('')
+
+const detailOpen = ref(false)
+const detailRow = ref<SignalRow | null>(null)
+const detailMarkdown = ref('')
+const detailModelName = ref('')
+
+const sseConnected = ref(false)
+let eventSource: EventSource | null = null
+let reconnectTimer: number | null = null
+let refreshTimer: number | null = null
+
+function isAnalysisTab(tab: string): tab is TabTag {
+  return ANALYSIS_TABS.includes(tab as TabTag)
+}
+
+const isLoggedIn = computed(() => accessToken.value.length > 0)
+const isAnalysisView = computed(() => isAnalysisTab(activeTab.value))
+const currentAnalysisTab = computed<TabTag>(() => (isAnalysisTab(activeTab.value) ? activeTab.value : 'futures'))
+const currentTabMeta = computed(() => TAB_META[activeTab.value] ?? TAB_META.futures)
+
+const renderableResponses = computed(() =>
+  responses.value.filter(
+    (item) => item.status === 'completed' && hasRenderableMarkdownTable(item.response || ''),
+  ),
+)
+const batchCreatedAt = computed(() => asTimeString(renderableResponses.value[0]?.created_at))
+const successCount = computed(() => renderableResponses.value.length)
+const totalCount = computed(() => renderableResponses.value.length)
+
+const modelGroups = computed(() =>
+  renderableResponses.value.map((item) => ({
+    key: `${item.provider}:${item.model_name}:${item.id ?? item.batch_id}`,
+    modelName: item.model_name,
+    provider: item.provider,
+    status: item.status,
+    error: item.error,
+    markdown: item.response || '',
+  })),
+)
 
 function handleScroll() {
   showBackToTop.value = window.scrollY > scrollThreshold
 }
 
 function scrollToTop() {
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth'
-  })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
-
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll, { passive: true })
-})
-
-onUnmounted(() => {
-  window.removeEventListener('scroll', handleScroll)
-})
-
-const authStorageKey = 'tc_auth'
-
-const tabMeta: Record<string, { title: string; description: string }> = {
-  futures: {
-    title: '期货',
-    description: '展示最新一批 AI 分析结果。',
-  },
-  options: {
-    title: '期权',
-    description: '该页面暂未开发完成，敬请期待。',
-  },
-  news: {
-    title: '新闻',
-    description: '该页面暂未开发完成，敬请期待。',
-  },
-  plan: {
-    title: '计划',
-    description: '该页面暂未开发完成，敬请期待。',
-  },
-  position: {
-    title: '持仓',
-    description: '该页面暂未开发完成，敬请期待。',
-  },
-  about: {
-    title: '关于',
-    description: '关于本系统的信息。',
-  },
-}
-
-const currentTabMeta = computed(() => tabMeta[activeTab.value] ?? tabMeta.futures)
-const isFuturesTab = computed(() => activeTab.value === 'futures')
-const isLoggedIn = computed(() => accessToken.value.length > 0)
 
 function persistAuth() {
   localStorage.setItem(
@@ -107,7 +153,11 @@ function loadAuth() {
   if (!raw) return
 
   try {
-    const parsed = JSON.parse(raw) as { accessToken?: string; refreshToken?: string; username?: string }
+    const parsed = JSON.parse(raw) as {
+      accessToken?: string
+      refreshToken?: string
+      username?: string
+    }
     accessToken.value = parsed.accessToken ?? ''
     refreshToken.value = parsed.refreshToken ?? ''
     currentUsername.value = parsed.username ?? ''
@@ -127,12 +177,12 @@ function clearAuth() {
   localStorage.removeItem('tc_access_token')
 }
 
-function handleTabChange(tab: any) {
-  activeTab.value = tab.props.name as string
+function handleTabChange(tab: { props: { name: string } }) {
+  activeTab.value = tab.props.name as AppTab
   mobileMenuOpen.value = false
 }
 
-function handleMobileTabChange(tabName: string) {
+function handleMobileTabChange(tabName: AppTab) {
   activeTab.value = tabName
   mobileMenuOpen.value = false
 }
@@ -145,217 +195,103 @@ function handleTouchStart(event: TouchEvent) {
 
 function handleTouchEnd(event: TouchEvent) {
   if (!isMobile.value) return
+
   endX.value = event.changedTouches[0].clientX
   endY.value = event.changedTouches[0].clientY
-  
+
   const diffX = startX.value - endX.value
   const diffY = startY.value - endY.value
-  
-  // 只处理水平滑动，忽略垂直滑动
-  if (Math.abs(diffX) > Math.abs(diffY)) {
-    const threshold = 50
-    if (Math.abs(diffX) > threshold) {
-      const tabNames = ['futures', 'options', 'news', 'plan', 'position', 'about']
-      const currentIndex = tabNames.indexOf(activeTab.value)
+  if (Math.abs(diffX) <= Math.abs(diffY) || Math.abs(diffX) <= 50) return
 
-      if (diffX > 0) {
-        // 向左滑动，切换到下一个标签
-        const nextIndex = (currentIndex + 1) % tabNames.length
-        activeTab.value = tabNames[nextIndex]
-      } else {
-        // 向右滑动，切换到上一个标签
-        const prevIndex = (currentIndex - 1 + tabNames.length) % tabNames.length
-        activeTab.value = tabNames[prevIndex]
-      }
-    }
+  const currentIndex = NAV_TABS.indexOf(activeTab.value)
+  if (currentIndex < 0) return
+
+  if (diffX > 0) {
+    activeTab.value = NAV_TABS[(currentIndex + 1) % NAV_TABS.length]
+    return
   }
+
+  activeTab.value = NAV_TABS[(currentIndex - 1 + NAV_TABS.length) % NAV_TABS.length]
 }
 
-type ModelGroup = {
-  key: string
-  modelName: string
-  provider: string
-  status: string
-  error?: string
-  markdown: string
-}
-
-const loading = ref(false)
-const errorText = ref('')
-
-const responses = ref<AIResponse[]>([])
-
-const settingsOpen = ref(false)
-const detailOpen = ref(false)
-const detailRow = ref<SignalRow | null>(null)
-const detailMarkdown = ref('')
-const detailModelName = ref('')
-
-// 新闻相关状态
-const newsDetailOpen = ref(false)
-const currentNews = ref<NewsItem | null>(null)
-
-// 计划页面相关状态
-const showFuturesDialog = ref(false)
-const showOptionsDialog = ref(false)
-
-interface TradePlan {
-  id: number
-  symbol: string
-  openTime: string
-  closeTime: string
-  takeProfit: number
-  stopLoss: number
-  remark: string
-}
-
-const futuresPlans = ref<TradePlan[]>([
-  {
-    id: 1,
-    symbol: '沪金2608',
-    openTime: '2026-04-17 09:30',
-    closeTime: '2026-04-18 15:00',
-    takeProfit: 460.00,
-    stopLoss: 450.00,
-    remark: '趋势多头，突破前高'
-  },
-  {
-    id: 2,
-    symbol: '原油2606',
-    openTime: '2026-04-17 21:00',
-    closeTime: '2026-04-18 15:00',
-    takeProfit: 550.00,
-    stopLoss: 520.00,
-    remark: '地缘风险溢价'
-  },
-  {
-    id: 3,
-    symbol: '螺纹钢2607',
-    openTime: '2026-04-17 10:00',
-    closeTime: '2026-04-17 15:00',
-    takeProfit: 3650.00,
-    stopLoss: 3550.00,
-    remark: '基建需求预期'
-  }
-])
-
-const optionsPlans = ref<TradePlan[]>([
-  {
-    id: 1,
-    symbol: '沪金2608P455',
-    openTime: '2026-04-17 10:00',
-    closeTime: '2026-04-18 15:00',
-    takeProfit: 250.00,
-    stopLoss: 120.00,
-    remark: '买看跌期权，对冲风险'
-  },
-  {
-    id: 2,
-    symbol: '原油2606C530',
-    openTime: '2026-04-17 21:30',
-    closeTime: '2026-04-18 15:00',
-    takeProfit: 180.00,
-    stopLoss: 80.00,
-    remark: '买看涨期权，小仓位试多'
-  }
-])
-
-const futuresForm = ref<Omit<TradePlan, 'id'>>({
-  symbol: '',
-  openTime: '',
-  closeTime: '',
-  takeProfit: 0,
-  stopLoss: 0,
-  remark: ''
-})
-
-const optionsForm = ref<Omit<TradePlan, 'id'>>({
-  symbol: '',
-  openTime: '',
-  closeTime: '',
-  takeProfit: 0,
-  stopLoss: 0,
-  remark: ''
-})
-
-function addFuturesPlan() {
-  const newPlan: TradePlan = {
-    id: futuresPlans.value.length + 1,
-    ...futuresForm.value
-  }
-  futuresPlans.value.push(newPlan)
-  showFuturesDialog.value = false
-  // 重置表单
-  futuresForm.value = {
-    symbol: '',
-    openTime: '',
-    closeTime: '',
-    takeProfit: 0,
-    stopLoss: 0,
-    remark: ''
-  }
-}
-
-function addOptionsPlan() {
-  const newPlan: TradePlan = {
-    id: optionsPlans.value.length + 1,
-    ...optionsForm.value
-  }
-  optionsPlans.value.push(newPlan)
-  showOptionsDialog.value = false
-  // 重置表单
-  optionsForm.value = {
-    symbol: '',
-    openTime: '',
-    closeTime: '',
-    takeProfit: 0,
-    stopLoss: 0,
-    remark: ''
-  }
-}
-
-function removeFuturesPlan(id: number) {
-  futuresPlans.value = futuresPlans.value.filter(plan => plan.id !== id)
-}
-
-function removeOptionsPlan(id: number) {
-  optionsPlans.value = optionsPlans.value.filter(plan => plan.id !== id)
-}
-
-const batchCreatedAt = computed(() => {
-  const first = responses.value[0]?.created_at
-  return asTimeString(first)
-})
-
-const completedResponses = computed(() => responses.value.filter((r) => r.status === 'completed'))
-
-const modelGroups = computed<ModelGroup[]>(() => {
-  return completedResponses.value
-    .filter((r) => hasRenderableMarkdownTable(r.response || ''))
-    .map((r) => ({
-      key: `${r.provider}:${r.model_name}:${r.id ?? ''}`,
-      modelName: r.model_name,
-      provider: r.provider,
-      status: r.status,
-      error: r.error,
-      markdown: r.response || '',
-    }))
-})
-
-const successCount = computed(() => modelGroups.value.length)
-const totalCount = computed(() => responses.value.length)
-
-async function loadLatest() {
+async function loadLatest(tab: TabTag = currentAnalysisTab.value) {
   loading.value = true
   errorText.value = ''
   try {
-    const list = await getLatestAIResponses()
-    responses.value = list
-  } catch (e) {
+    responses.value = await getLatestAIResponses(tab)
+  } catch (error) {
     responses.value = []
-    errorText.value = e instanceof Error ? e.message : String(e)
+    errorText.value = error instanceof Error ? error.message : String(error)
   } finally {
     loading.value = false
+  }
+}
+
+function queueLatestReload(tab: TabTag) {
+  if (refreshTimer !== null) {
+    window.clearTimeout(refreshTimer)
+  }
+  refreshTimer = window.setTimeout(() => {
+    refreshTimer = null
+    if (currentAnalysisTab.value === tab) {
+      void loadLatest(tab)
+    }
+  }, eventRefreshDelay)
+}
+
+function clearReconnectTimer() {
+  if (reconnectTimer !== null) {
+    window.clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+}
+
+function scheduleEventReconnect(tab: TabTag) {
+  clearReconnectTimer()
+  reconnectTimer = window.setTimeout(() => {
+    reconnectTimer = null
+    if (currentAnalysisTab.value === tab) {
+      startEventStream(tab)
+    }
+  }, eventReconnectDelay)
+}
+
+function stopEventStream() {
+  sseConnected.value = false
+  clearReconnectTimer()
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
+}
+
+function startEventStream(tab: TabTag = currentAnalysisTab.value) {
+  stopEventStream()
+
+  const source = new EventSource(getAIResponseEventsUrl(tab))
+  eventSource = source
+
+  source.addEventListener('ai_response_updated', (event) => {
+    try {
+      const payload = JSON.parse((event as MessageEvent<string>).data) as AIResponseEvent
+      if (payload.status !== 'completed') return
+      queueLatestReload(tab)
+    } catch {
+      queueLatestReload(tab)
+    }
+  })
+
+  source.onopen = () => {
+    sseConnected.value = true
+  }
+
+  source.onerror = () => {
+    sseConnected.value = false
+    if (eventSource === source) {
+      source.close()
+      eventSource = null
+    }
+    scheduleEventReconnect(tab)
   }
 }
 
@@ -365,26 +301,6 @@ function onOpenDetail(row: SignalRow, markdown: string, modelName: string) {
   detailModelName.value = modelName
   detailOpen.value = true
 }
-
-function onOpenNewsDetail(news: NewsItem) {
-  currentNews.value = news
-  newsDetailOpen.value = true
-}
-
-const systemTitle = ref('Trading Chats')
-const systemLogo = ref('')
-
-const optionsMarkdown1 = `| 序号 | 期权合约 | 策略 | 持仓时间 | 入场权利金区间 | 止损条件 | 止盈条件 | 博弈买方逻辑 | 博弈卖方逻辑 | 技术要点 | 波动率分析 | 期权情绪指标 | 基本面要点 | 资金流向（标的市场） | 多单持仓量变化（标的） | 空单持仓量变化（标的） | 
- |------|----------|------|----------|----------------|----------|----------|--------------|--------------|----------|------------|--------------|------------|---------------------|---------------------|---------------------| 
- | 1 | 沪金26年08月沽664(au2608P664) | 买看跌 | 3.0天 | 235-245元 | 权利金亏损50%或黄金突破550元/克 | 权利金上涨100%或黄金跌破530元/克 | 黄金技术破位下行，IV处于高位提供保护 | 高IV提供卖权优势，但趋势下行不利卖方 | 日线MACD死叉，RSI超买回落 | IV高于HV15%，波动率锥上轨 | PCR=1.3，认沽增仓明显 | 美联储鹰派言论，实际利率上升 | 资金流出黄金ETF，COMEX净空头增仓 | -1200手 | +1800手 | 
- | 2 | 沪银26年06月沽10100(ag2606P10100) | 买看跌 | 2.5天 | 205-215元 | 权利金亏损40%或白银突破6500元/千克 | 权利金上涨80%或白银跌破6200元/千克 | 白银弱势明显，期权杠杆放大收益 | 高权利金提供卖权优势，但流动性风险 | 4小时级别跌破BOLL下轨，KDJ超卖 | IV/HV比值1.2，高于均值 | PCR=1.5，认沽持仓占比70% | 工业需求疲软，美元走强压制 | 期货市场资金流出，空头主导 | -850手 | +1200手 | 
- | 3 | 原油26年06月购1020(sc2606C1020) | 买看涨 | 3.0天 | 225-235元 | 权利金亏损45%或原油跌破510元/桶 | 权利金上涨90%或原油突破540元/桶 | 地缘风险溢价，技术突破确认 | 时间价值损耗快，需快速行情配合 | 周线级别突破下降趋势线，成交量放大 | IV处于历史70%分位 | 认购增仓205手，资金流入明显 | 中东局势紧张，OPEC+减产延长 | 期货多头增仓，资金流入能源板块 | +2300手 | -1500手 |`
-
-const optionsMarkdown2 = `| 序号 | 期权合约 | 策略 | 持仓时间 | 入场权利金区间 | 止损条件 | 止盈条件 | 博弈买方逻辑 | 博弈卖方逻辑 | 技术要点 | 波动率分析 | 期权情绪指标 | 基本面要点 | 资金流向（标的市场） | 多单持仓量变化（标的） | 空单持仓量变化（标的） | 
- |------|----------|------|----------|----------------|----------|----------|--------------|--------------|----------|------------|--------------|------------|---------------------|---------------------|---------------------| 
- | 1 | 沪铝26年06月购29400(al2606C29400) | 买看涨 | 2.0天 | 90-100元 | 权利金亏损50%或铝价跌破19200元/吨 | 权利金上涨110%或铝价突破19800元/吨 | 供给端收缩，技术形态强势 | 高Gamma提供卖权风险，低Theta有利 | 30分钟级别突破压力位，MACD金叉 | HV上升至25%，IV滞后反应 | 认购持仓占比65%，资金持续流入 | 云南限电，氧化铝成本支撑 | 期货资金流入，库存持续下降 | +1800手 | -900手 | 
- | 2 | 螺纹钢26年07月购3600(rb2607C3600) | 买看涨 | 2.5天 | 95-105元 | 权利金亏损40%或螺纹跌破3500元/吨 | 权利金上涨85%或螺纹突破3700元/吨 | 基建开工旺季，技术底背离 | 隐含波动率偏低，卖权性价比高 | 日线级别底背离，BOLL收口待突破 | IV处于历史30%分位，修复空间大 | PCR=0.8，认购情绪回暖 | 稳增长政策加码，地产需求改善 | 期货市场资金回流，空头回补 | +1500手 | -1100手 | 
- | 3 | 铜26年06月购72000(cu2606C72000) | 买看涨 | 3.5天 | 320-330元 | 权利金亏损45%或铜价跌破70000元/吨 | 权利金上涨95%或铜价突破73000元/吨 | 全球经济复苏预期，需求增加 | 波动率处于高位，卖权风险较大 | 月线级别金叉，量价配合良好 | IV处于历史60%分位 | 认购持仓占比60%，资金流入 | 新能源汽车需求增长，铜矿供应紧张 | 期货多头增仓，外资持续流入 | +2100手 | -1300手 |`
 
 async function loadSystemConfig() {
   try {
@@ -396,8 +312,8 @@ async function loadSystemConfig() {
     if (config.system_logo) {
       systemLogo.value = config.system_logo
     }
-  } catch (e) {
-    console.error('Failed to load system config', e)
+  } catch (error) {
+    console.error('Failed to load system config', error)
   }
 }
 
@@ -415,11 +331,17 @@ function handleLoginSuccess(payload: { accessToken: string; refreshToken: string
   currentUsername.value = payload.username
   localStorage.setItem('tc_access_token', payload.accessToken)
   persistAuth()
+  if (isAnalysisView.value) {
+    startEventStream(currentAnalysisTab.value)
+  }
   settingsOpen.value = true
 }
 
 function handleLogout() {
   clearAuth()
+  if (isAnalysisView.value) {
+    startEventStream(currentAnalysisTab.value)
+  }
   settingsOpen.value = false
   ElMessage.success('已退出登录')
 }
@@ -429,8 +351,26 @@ onMounted(() => {
   if (accessToken.value) {
     localStorage.setItem('tc_access_token', accessToken.value)
   }
-  loadSystemConfig()
-  loadLatest()
+
+  window.addEventListener('scroll', handleScroll, { passive: true })
+
+  void loadSystemConfig()
+  void loadLatest(currentAnalysisTab.value)
+  startEventStream(currentAnalysisTab.value)
+})
+
+watch(currentAnalysisTab, (tab) => {
+  void loadLatest(tab)
+  startEventStream(tab)
+})
+
+onUnmounted(() => {
+  if (refreshTimer !== null) {
+    window.clearTimeout(refreshTimer)
+    refreshTimer = null
+  }
+  stopEventStream()
+  window.removeEventListener('scroll', handleScroll)
 })
 </script>
 
@@ -441,11 +381,10 @@ onMounted(() => {
         <img v-if="systemLogo" :src="systemLogo" alt="Logo" class="tc-logo" />
         <div class="tc-title">{{ systemTitle }}</div>
       </div>
-      
-      <div class="tc-header-tabs" v-if="!isMobile">
-        <el-tabs v-model="activeTab" @tab-click="(tab: any) => handleTabChange(tab)" class="ogo-tabs">
 
-          <el-tab-pane :name="'futures'">
+      <div v-if="!isMobile" class="tc-header-tabs">
+        <el-tabs v-model="activeTab" class="ogo-tabs" @tab-click="(tab: any) => handleTabChange(tab)">
+          <el-tab-pane name="futures">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><DataAnalysis /></div>
@@ -453,7 +392,7 @@ onMounted(() => {
               </div>
             </template>
           </el-tab-pane>
-          <el-tab-pane :name="'options'">
+          <el-tab-pane name="options">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><PieChart /></div>
@@ -461,7 +400,7 @@ onMounted(() => {
               </div>
             </template>
           </el-tab-pane>
-          <el-tab-pane :name="'news'">
+          <el-tab-pane name="news">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><Notification /></div>
@@ -469,7 +408,7 @@ onMounted(() => {
               </div>
             </template>
           </el-tab-pane>
-          <el-tab-pane :name="'plan'">
+          <el-tab-pane name="plan">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><Calendar /></div>
@@ -477,7 +416,7 @@ onMounted(() => {
               </div>
             </template>
           </el-tab-pane>
-          <el-tab-pane :name="'position'">
+          <el-tab-pane name="position">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><Position /></div>
@@ -485,7 +424,7 @@ onMounted(() => {
               </div>
             </template>
           </el-tab-pane>
-          <el-tab-pane :name="'about'">
+          <el-tab-pane name="about">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><InfoFilled /></div>
@@ -497,50 +436,50 @@ onMounted(() => {
       </div>
 
       <div class="tc-header-right">
-        <el-button circle @click="handleSettingsClick" title="设置">
+        <el-button circle title="设置" @click="handleSettingsClick">
           <el-icon><User /></el-icon>
         </el-button>
-        <el-button v-if="isMobile" circle @click="mobileMenuOpen = !mobileMenuOpen" title="菜单">
+        <el-button v-if="isMobile" circle title="菜单" @click="mobileMenuOpen = !mobileMenuOpen">
           <el-icon><Menu /></el-icon>
         </el-button>
       </div>
     </el-header>
 
-    <!-- 移动端菜单 -->
-    <div v-if="isMobile" class="tc-mobile-menu-container" :class="{ 'open': mobileMenuOpen }">
-      <div class="tc-mobile-menu-overlay" @click="mobileMenuOpen = false"></div>
+    <div v-if="isMobile" class="tc-mobile-menu-container" :class="{ open: mobileMenuOpen }">
+      <div class="tc-mobile-menu-overlay" @click="mobileMenuOpen = false" />
       <div class="tc-mobile-menu-content">
-        <div 
-          v-for="tab in ['futures', 'options', 'news', 'plan', 'position', 'about']" 
+        <div
+          v-for="tab in NAV_TABS"
           :key="tab"
           class="tc-mobile-menu-item"
           :class="{ active: activeTab === tab }"
           @click="handleMobileTabChange(tab)"
         >
           <div class="tc-mobile-menu-icon">
-            <DataAnalysis v-if="tab === 'futures'"></DataAnalysis>
-            <PieChart v-else-if="tab === 'options'"></PieChart>
-            <Notification v-else-if="tab === 'news'"></Notification>
-            <Calendar v-else-if="tab === 'plan'"></Calendar>
-            <Position v-else-if="tab === 'position'"></Position>
-            <InfoFilled v-else-if="tab === 'about'"></InfoFilled>
+            <DataAnalysis v-if="tab === 'futures'" />
+            <PieChart v-else-if="tab === 'options'" />
+            <Notification v-else-if="tab === 'news'" />
+            <Calendar v-else-if="tab === 'plan'" />
+            <Position v-else-if="tab === 'position'" />
+            <InfoFilled v-else />
           </div>
-          <span class="tc-mobile-menu-text">{{ tabMeta[tab].title }}</span>
+          <span class="tc-mobile-menu-text">{{ TAB_META[tab].title }}</span>
         </div>
       </div>
     </div>
 
-
-
     <el-main class="tc-main" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
-      <template v-if="isFuturesTab">
+      <template v-if="isAnalysisView">
         <div class="tc-toolbar">
-          <div>
-            <div class="tc-time">数据更新时间：{{ batchCreatedAt || '-' }}</div>
+          <div class="tc-toolbar-meta">
+            <div class="tc-time">最近数据时间：{{ batchCreatedAt || '-' }}</div>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div class="tc-toolbar-actions">
+            <el-tag :type="sseConnected ? 'success' : 'info'">
+              {{ sseConnected ? '实时刷新已连接' : '实时刷新重连中' }}
+            </el-tag>
             <el-tag type="success">成功 {{ successCount }}/{{ totalCount }}</el-tag>
-            <el-button circle @click="loadLatest" :loading="loading" title="刷新数据">
+            <el-button circle title="刷新数据" :loading="loading" @click="loadLatest()">
               <el-icon><Refresh /></el-icon>
             </el-button>
           </div>
@@ -552,11 +491,11 @@ onMounted(() => {
           :closable="false"
           show-icon
           :title="errorText"
-          style="margin-bottom: 12px"
+          class="tc-alert"
         />
 
         <div v-if="modelGroups.length === 0" class="tc-empty">
-          <el-empty description="暂无分析结果" />
+          <el-empty :description="loading ? '正在加载最新数据' : '暂无分析结果'" />
         </div>
 
         <div v-else class="tc-list">
@@ -574,178 +513,8 @@ onMounted(() => {
         </div>
       </template>
 
-      <template v-else-if="activeTab === 'options'">
-        <div class="tc-toolbar">
-          <div>
-            <div class="tc-time">数据更新时间：{{ new Date().toLocaleString() }}</div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <el-tag type="info">期权策略分析</el-tag>
-          </div>
-        </div>
-
-        <div class="tc-list">
-          <el-card shadow="never" class="tc-model-card">
-            <template #header>
-              <div class="tc-model-header">
-                <div class="tc-model-title">
-                  <div class="tc-model-name">期权策略分析 - 贵金属与能源</div>
-                  <el-tag size="small" type="success">completed</el-tag>
-                  <el-tag size="small" type="info">AI 分析</el-tag>
-                </div>
-              </div>
-            </template>
-            <MarkdownRenderer :markdown="optionsMarkdown1" />
-          </el-card>
-          
-          <el-card shadow="never" class="tc-model-card">
-            <template #header>
-              <div class="tc-model-header">
-                <div class="tc-model-title">
-                  <div class="tc-model-name">期权策略分析 - 有色金属</div>
-                  <el-tag size="small" type="success">completed</el-tag>
-                  <el-tag size="small" type="info">AI 分析</el-tag>
-                </div>
-              </div>
-            </template>
-            <MarkdownRenderer :markdown="optionsMarkdown2" />
-          </el-card>
-        </div>
-      </template>
-
-      <template v-else-if="activeTab === 'news'">
-        <div class="tc-toolbar">
-          <div>
-            <div class="tc-time">数据更新时间：{{ new Date().toLocaleString() }}</div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <el-tag type="primary">金融新闻</el-tag>
-          </div>
-        </div>
-
-        <NewsList 
-          :mobile="isMobile"
-          @open-detail="onOpenNewsDetail"
-        />
-      </template>
-
       <template v-else-if="activeTab === 'plan'">
-        <div class="tc-toolbar">
-          <div>
-            <div class="tc-time">数据更新时间：{{ new Date().toLocaleString() }}</div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <el-tag type="warning">交易计划管理</el-tag>
-          </div>
-        </div>
-
-        <div class="tc-plan-container">
-          <div class="tc-plan-section">
-            <div class="tc-plan-header">
-              <h3>期货交易计划</h3>
-              <el-button type="primary" size="small" @click="showFuturesDialog = true">新增计划</el-button>
-            </div>
-            <el-table :data="futuresPlans" style="width: 100%" border>
-              <el-table-column prop="id" label="序号" width="60" />
-              <el-table-column prop="symbol" label="品种名称" />
-              <el-table-column prop="openTime" label="开仓时间" />
-              <el-table-column prop="closeTime" label="平仓时间" />
-              <el-table-column prop="takeProfit" label="止盈" />
-              <el-table-column prop="stopLoss" label="止损" />
-              <el-table-column prop="remark" label="备注" />
-              <el-table-column label="操作" width="100">
-                <template #default="{ row }">
-                  <el-button type="danger" size="small" @click="removeFuturesPlan(row.id)">移除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-
-          <div class="tc-plan-section">
-            <div class="tc-plan-header">
-              <h3>期权交易计划</h3>
-              <el-button type="primary" size="small" @click="showOptionsDialog = true">新增计划</el-button>
-            </div>
-            <el-table :data="optionsPlans" style="width: 100%" border>
-              <el-table-column prop="id" label="序号" width="60" />
-              <el-table-column prop="symbol" label="品种名称" />
-              <el-table-column prop="openTime" label="开仓时间" />
-              <el-table-column prop="closeTime" label="平仓时间" />
-              <el-table-column prop="takeProfit" label="止盈" />
-              <el-table-column prop="stopLoss" label="止损" />
-              <el-table-column prop="remark" label="备注" />
-              <el-table-column label="操作" width="100">
-                <template #default="{ row }">
-                  <el-button type="danger" size="small" @click="removeOptionsPlan(row.id)">移除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </div>
-
-        <!-- 期货计划新增对话框 -->
-        <el-dialog v-model="showFuturesDialog" title="新增期货交易计划" :width="isMobile ? '90%' : '500px'">
-          <el-form :model="futuresForm" label-width="100px">
-            <el-form-item label="品种名称">
-              <el-input v-model="futuresForm.symbol" placeholder="请输入品种名称" />
-            </el-form-item>
-            <el-form-item label="开仓时间">
-              <el-date-picker v-model="futuresForm.openTime" type="datetime" placeholder="选择开仓时间" style="width: 100%" />
-            </el-form-item>
-            <el-form-item label="平仓时间">
-              <el-date-picker v-model="futuresForm.closeTime" type="datetime" placeholder="选择平仓时间" style="width: 100%" />
-            </el-form-item>
-            <el-form-item label="止盈">
-              <el-input v-model="futuresForm.takeProfit" type="number" placeholder="请输入止盈价格" />
-            </el-form-item>
-            <el-form-item label="止损">
-              <el-input v-model="futuresForm.stopLoss" type="number" placeholder="请输入止损价格" />
-            </el-form-item>
-            <el-form-item label="备注">
-              <el-input v-model="futuresForm.remark" type="textarea" placeholder="请输入备注" />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <span class="dialog-footer">
-              <el-button @click="showFuturesDialog = false">取消</el-button>
-              <el-button type="primary" @click="addFuturesPlan">确定</el-button>
-            </span>
-          </template>
-        </el-dialog>
-
-        <!-- 期权计划新增对话框 -->
-        <el-dialog v-model="showOptionsDialog" title="新增期权交易计划" :width="isMobile ? '90%' : '500px'">
-          <el-form :model="optionsForm" label-width="100px">
-            <el-form-item label="品种名称">
-              <el-input v-model="optionsForm.symbol" placeholder="请输入品种名称" />
-            </el-form-item>
-            <el-form-item label="开仓时间">
-              <el-date-picker v-model="optionsForm.openTime" type="datetime" placeholder="选择开仓时间" style="width: 100%" />
-            </el-form-item>
-            <el-form-item label="平仓时间">
-              <el-date-picker v-model="optionsForm.closeTime" type="datetime" placeholder="选择平仓时间" style="width: 100%" />
-            </el-form-item>
-            <el-form-item label="止盈">
-              <el-input v-model="optionsForm.takeProfit" type="number" placeholder="请输入止盈价格" />
-            </el-form-item>
-            <el-form-item label="止损">
-              <el-input v-model="optionsForm.stopLoss" type="number" placeholder="请输入止损价格" />
-            </el-form-item>
-            <el-form-item label="备注">
-              <el-input v-model="optionsForm.remark" type="textarea" placeholder="请输入备注" />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <span class="dialog-footer">
-              <el-button @click="showOptionsDialog = false">取消</el-button>
-              <el-button type="primary" @click="addOptionsPlan">确定</el-button>
-            </span>
-          </template>
-        </el-dialog>
-      </template>
-
-      <template v-else-if="activeTab === 'position'">
-        <PositionPage :mobile="isMobile" />
+        <TradePlansPage :mobile="isMobile" :logged-in="isLoggedIn" @request-login="loginOpen = true" />
       </template>
 
       <template v-else-if="activeTab === 'about'">
@@ -761,44 +530,17 @@ onMounted(() => {
       </div>
     </el-main>
 
-    <!-- ===== 页脚信息 ===== -->
-    <div class="box my-footer" style="
-      width: 100%;
-      padding: 15px 0;
-      text-align: center;
-      background: rgba(0, 0, 0, 0.03);
-      border-top: 1px solid #e0e0e0;
-      font-size: 13px;
-      color: #888;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      user-select: none;
-      margin-top: 20px;
-    ">
-      <ul class="link line-right" style="
-        list-style: none;
-        padding: 0;
-        margin: 0 0 10px 0;
-        display: flex;
-        justify-content: center;
-        gap: 15px;
-      ">
-        <li style="cursor: pointer;">
-          <i class="iconfont icon-html" style="font-size: 18px; color: #666;"></i>
-        </li>
-        <li style="cursor: pointer; position: relative;">
-          <i class="iconfont icon-weixin" style="font-size: 18px; color: #666;"></i>
-        </li>
-      </ul>
+    <footer class="tc-footer">
       <div class="about">
-         <p class="copyright" style="margin: 0 0 5px 0;">
-          © 2026 凌期AI个人自用
-        </p>
-        <p class="copyright" style="margin: 0 0 5px 0; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
-          <a href="http://beian.miit.gov.cn" target="_blank" style="color: #666; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#1890ff'" onmouseout="this.style.color='#666'">ICP主体备案号：浙ICP备2026020164号</a>
-          <a href="https://beian.mps.gov.cn/#/" target="_blank" style="color: #666; text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#1890ff'" onmouseout="this.style.color='#666'">全国互联网安全管理服务平台</a>
+        <p class="copyright">© 2026 凌期AI个人自用</p>
+        <p class="copyright copyright-links">
+          <a href="http://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer">ICP主体备案号：浙ICP备2026020164号</a>
+          <a href="https://beian.mps.gov.cn/#/" target="_blank" rel="noopener noreferrer">全国互联网安全管理服务平台</a>
         </p>
       </div>
-    </div>
+      <div>© 2026 Trading Chats</div>
+      <div>当前页支持期货 / 期权 / 新闻 / 持仓实时刷新</div>
+    </footer>
 
     <SettingsDrawer
       v-if="isLoggedIn"
@@ -816,15 +558,8 @@ onMounted(() => {
       :mobile="isMobile"
     />
 
-    <NewsDetailDrawer
-      v-model="newsDetailOpen"
-      :news="currentNews"
-      :mobile="isMobile"
-    />
-
     <LoginDialog v-model="loginOpen" @success="handleLoginSuccess" />
 
-    <!-- 右下角固定按钮组 -->
     <div class="tc-fixed-buttons">
       <el-button
         v-if="showBackToTop"
@@ -832,8 +567,8 @@ onMounted(() => {
         circle
         class="tc-back-to-top"
         :size="isMobile ? 'large' : 'default'"
-        @click="scrollToTop"
         title="返回顶部"
+        @click="scrollToTop"
       >
         <el-icon><ArrowUp /></el-icon>
       </el-button>
@@ -841,11 +576,11 @@ onMounted(() => {
         circle
         class="tc-theme-toggle"
         :size="isMobile ? 'large' : 'default'"
-        @click="mode = mode === 'dark' ? 'light' : 'dark'"
         :title="mode === 'dark' ? '浅色模式' : '深色模式'"
+        @click="mode = isDark ? 'light' : 'dark'"
       >
-        <el-icon v-if="mode !== 'dark'"><Moon /></el-icon>
-        <el-icon v-else><Sunny /></el-icon>
+        <el-icon v-if="!isDark"><Sunny /></el-icon>
+        <el-icon v-else><Moon /></el-icon>
       </el-button>
     </div>
   </el-container>
@@ -861,10 +596,9 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--el-border-color-light);
   background: var(--el-bg-color);
-  padding: 0 16px;
-  flex-wrap: nowrap;
 }
 
 .tc-header-left,
@@ -873,6 +607,11 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+}
+
+.tc-header-tabs {
+  flex: 1;
+  min-width: 0;
 }
 
 .tc-logo {
@@ -886,44 +625,89 @@ onMounted(() => {
   font-weight: 700;
 }
 
-.tc-header-tabs {
-  flex: 1;
-  min-width: 0;
-}
-
 .tc-main {
   background: var(--el-bg-color-page);
 }
 
 .tc-toolbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
 
-.tc-batch {
-  font-weight: 600;
+.tc-toolbar-meta {
+  min-width: 0;
+}
+
+.tc-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .tc-time {
+  margin-top: 4px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  margin-top: 4px;
+}
+
+.tc-alert {
+  margin-bottom: 12px;
 }
 
 .tc-empty {
-  background: var(--el-bg-color);
-  border-radius: 12px;
   padding: 24px;
+  border-radius: 12px;
+  background: var(--el-bg-color);
 }
 
 .tc-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.tc-footer {
+  padding: 14px 16px 18px;
+  color: var(--el-text-color-secondary);
+  text-align: center;
+  border-top: 1px solid var(--el-border-color-light);
+  background: var(--el-bg-color);
+}
+
+.tc-footer > div:not(.about) {
+  display: none;
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.copyright {
+  margin: 0 0 5px;
+}
+
+.copyright-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.copyright-links a {
+  color: #666;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.copyright-links a:hover {
+  color: #1890ff;
 }
 
 .ogo-tabs :deep(.el-tabs__header) {
@@ -940,6 +724,10 @@ onMounted(() => {
   margin-right: 16px;
 }
 
+.ogo-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
 .ogo-tabs-tab-btn {
   display: flex;
   align-items: center;
@@ -950,11 +738,11 @@ onMounted(() => {
 }
 
 .ogo-tabs-icon {
-  width: 18px;
-  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 18px;
+  height: 18px;
 }
 
 .ogo-tabs-text {
@@ -963,25 +751,161 @@ onMounted(() => {
 }
 
 .ogo-tabs :deep(.el-tabs__item.is-active .ogo-tabs-tab-btn) {
-  background: var(--el-color-primary-light-9);
   color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
 }
 
-.ogo-tabs :deep(.el-tabs__active-bar) {
-  display: none;
+.tc-mobile-menu-container {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.tc-mobile-menu-container.open {
+  pointer-events: auto;
+}
+
+.tc-mobile-menu-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.tc-mobile-menu-content {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 220px;
+  height: 100%;
+  padding: 16px 12px;
+  background: var(--el-bg-color);
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.12);
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+}
+
+.tc-mobile-menu-container.open .tc-mobile-menu-content {
+  transform: translateX(0);
+}
+
+.tc-mobile-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.tc-mobile-menu-item.active {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+.tc-mobile-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.tc-mobile-menu-text {
+  font-weight: 500;
 }
 
 .tc-placeholder-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - 120px);
+  min-height: calc(100vh - 180px);
+}
+
+.tc-fixed-buttons {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+}
+
+.tc-back-to-top,
+.tc-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(24, 144, 255, 0.14);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.tc-back-to-top {
+  order: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #1890ff 0%, #0f6adf 100%);
+}
+
+.tc-theme-toggle {
+  order: 2;
+  color: #1890ff;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 247, 255, 0.92) 100%);
+}
+
+.tc-back-to-top:hover,
+.tc-theme-toggle:hover {
+  transform: translateY(-2px);
+  border-color: rgba(24, 144, 255, 0.28);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.22);
+}
+
+.tc-back-to-top :deep(.el-icon),
+.tc-theme-toggle :deep(.el-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.tc-back-to-top :deep(svg),
+.tc-theme-toggle :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+:global(.dark) .tc-theme-toggle,
+.dark-mode .tc-theme-toggle {
+  color: #8ec5ff;
+  background: linear-gradient(135deg, rgba(21, 32, 48, 0.96) 0%, rgba(13, 22, 35, 0.92) 100%);
+  border-color: rgba(84, 170, 255, 0.22);
+}
+
+:global(.dark) .tc-back-to-top,
+.dark-mode .tc-back-to-top {
+  box-shadow: 0 14px 30px rgba(4, 11, 20, 0.42);
 }
 
 @media (max-width: 768px) {
   .tc-header {
     padding: 0 12px;
-    min-height: 56px;
   }
 
   .tc-title {
@@ -993,247 +917,25 @@ onMounted(() => {
     height: 28px;
   }
 
-  .tc-main {
-    padding: 12px;
+  .tc-footer {
+    padding-bottom: 80px;
   }
-}
 
-.tc-mobile-menu-container {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 2000;
-  pointer-events: none;
-}
-
-.tc-mobile-menu-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
-.tc-mobile-menu-content {
-  position: absolute;
-  top: 56px;
-  right: 12px;
-  width: 200px;
-  background: var(--el-bg-color);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  transform-origin: top right;
-  transform: scale(0.8) translateY(-10px);
-  opacity: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: none;
-  max-height: calc(100vh - 70px);
-  overflow-y: auto;
-}
-
-.tc-mobile-menu-container.open .tc-mobile-menu-overlay {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.tc-mobile-menu-container.open .tc-mobile-menu-content {
-  transform: scale(1) translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-  animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@keyframes slideDown {
-  0% {
-    transform: scale(0.8) translateY(-10px);
-    opacity: 0;
+  .copyright-links {
+    gap: 10px;
+    font-size: 12px;
   }
-  100% {
-    transform: scale(1) translateY(0);
-    opacity: 1;
-  }
-}
 
-.tc-mobile-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  border-bottom: 1px solid var(--el-border-color-light);
-}
-
-.tc-mobile-menu-item:last-child {
-  border-bottom: none;
-}
-
-.tc-mobile-menu-item:hover {
-  background: var(--el-color-primary-light-9);
-}
-
-.tc-mobile-menu-item.active {
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-}
-
-.tc-mobile-menu-icon {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tc-mobile-menu-text {
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.tc-fixed-buttons {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.tc-theme-toggle,
-.tc-back-to-top {
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  min-width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tc-theme-toggle:hover,
-.tc-back-to-top:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
-}
-
-@media (max-width: 768px) {
   .tc-fixed-buttons {
-    right: 20px;
-    bottom: 20px;
+    right: 12px;
+    bottom: 12px;
     gap: 10px;
   }
-  .tc-theme-toggle,
-  .tc-back-to-top {
-    min-width: 44px;
-    height: 44px;
+
+  .tc-back-to-top,
+  .tc-theme-toggle {
+    width: 46px;
+    height: 46px;
   }
 }
-
-.tc-plan-container {
-  display: flex;
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.tc-plan-section {
-  flex: 1;
-  background: var(--el-bg-color);
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
-.tc-plan-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.tc-plan-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-@media (max-width: 768px) {
-  .tc-plan-container {
-    flex-direction: column;
-  }
-  
-  .tc-plan-section {
-    padding: 16px;
-    overflow-x: auto;
-  }
-  
-  .tc-plan-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .tc-plan-section :deep(.el-table) {
-    min-width: 600px;
-  }
-  
-  .tc-plan-section :deep(.el-table__header-wrapper),
-  .tc-plan-section :deep(.el-table__body-wrapper) {
-    overflow-x: auto;
-  }
-  
-  .tc-plan-section :deep(.el-table th),
-  .tc-plan-section :deep(.el-table td) {
-    white-space: nowrap;
-  }
-  
-  .dialog-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    width: 100%;
-  }
-  
-  .dialog-footer .el-button {
-    flex: 1;
-    min-width: 80px;
-  }
-  
-  /* 表单在移动端的优化 */
-  .el-dialog :deep(.el-form) {
-    width: 100%;
-  }
-  
-  .el-dialog :deep(.el-form-item__label) {
-    font-size: 14px;
-  }
-  
-  .el-dialog :deep(.el-input),
-  .el-dialog :deep(.el-date-picker) {
-    width: 100%;
-  }
-  
-  .el-dialog :deep(.el-textarea) {
-    width: 100%;
-  }
-  
-  /* 确保按钮有足够的点击区域 */
-  .el-button {
-    min-height: 36px;
-  }
-  
-  .el-button--small {
-    min-height: 28px;
-  }
-}
-
 </style>

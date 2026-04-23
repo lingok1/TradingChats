@@ -35,6 +35,7 @@ func main() {
 	promptTemplateRepo := repository.NewPromptTemplateRepository(db.MongoDB)
 	modelAPIRepo := repository.NewModelAPIRepository(db.MongoDB)
 	aiResponseRepo := repository.NewAIResponseRepository(db.MongoDB)
+	tradePlanRepo := repository.NewTradePlanRepository(db.MongoDB)
 	scheduleRepo := repository.NewScheduleRepository(db.MongoDB)
 	systemConfigRepo := repository.NewSystemConfigRepository(db.MongoDB)
 	authRepo := repository.NewAuthRepository(db.MongoDB)
@@ -42,12 +43,20 @@ func main() {
 	systemConfigService := service.NewSystemConfigService(systemConfigRepo)
 	promptTemplateService := service.NewPromptTemplateService(promptTemplateRepo, systemConfigService)
 	modelAPIService := service.NewModelAPIService(modelAPIRepo)
-	aiResponseService := service.NewAIResponseService(aiResponseRepo, modelAPIService, promptTemplateService, systemConfigService)
+	aiResponseEventService := service.NewAIResponseEventService()
+	aiResponseService := service.NewAIResponseService(aiResponseRepo, modelAPIService, promptTemplateService, systemConfigService, aiResponseEventService)
+	tradePlanService := service.NewTradePlanService(tradePlanRepo)
 	scheduleService := service.NewScheduleService(scheduleRepo, aiResponseService, promptTemplateService)
 	authService := service.NewAuthService(authRepo, cfg.JWT)
 
 	if err := authService.EnsureBootstrapData(context.Background()); err != nil {
 		log.Fatalf("Failed to bootstrap auth data: %v", err)
+	}
+	if err := modelAPIService.EnsureTabSettings(context.Background()); err != nil {
+		log.Fatalf("Failed to backfill model api tab settings: %v", err)
+	}
+	if err := tradePlanService.EnsureIndexes(context.Background()); err != nil {
+		log.Fatalf("Failed to ensure trade plan indexes: %v", err)
 	}
 
 	if err := scheduleService.Start(context.Background()); err != nil {
@@ -55,7 +64,7 @@ func main() {
 	}
 	defer scheduleService.Stop()
 
-	r := api.SetupRouter(promptTemplateService, modelAPIService, aiResponseService, scheduleService, systemConfigService, authService, &cfg.Swagger)
+	r := api.SetupRouter(promptTemplateService, modelAPIService, aiResponseService, aiResponseEventService, tradePlanService, scheduleService, systemConfigService, authService, &cfg.Swagger)
 
 	log.Printf("Server running at http://localhost:%s", cfg.Server.Port)
 	if err := r.Run(":" + cfg.Server.Port); err != nil {

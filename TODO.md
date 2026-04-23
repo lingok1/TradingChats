@@ -18,13 +18,9 @@
 - ✅移动端将菜单切换放到后面，用户登录放到前面
 - ✅刷新按钮放到main里面
 - ✅右下角默认显示明暗切换，明暗切换和返回顶部放一起，顶部上明暗下
-- 主页介绍仿站 [PnLClaw - Crypto Quantitative Trading Platform](https://www.pnlclaw.com/)
-- 主页介绍仿站[ ](https://www.pnlclaw.com/)[LUCKYQUANT PRO](https://luckyquant.top/)
 - 定时刷新页面，根据系统配置来刷新
 - 后端完成ai response后sse通知前端刷新界面
-- 微信扫码登录
 - 顶部标签页切换后获取最新数据
-- token长时间未自动刷新
 - 参数，模型等添加搜索
 - 模型的启用禁用
 - 期权调用全部AI，新闻调用一个就够了
@@ -32,7 +28,13 @@
 - 内容表格右滑，显示品种
 - 模型列表变长一点，样式可以重新设计
 - 定时任务日志不显示还是单独一张表存储prompt
-- ai\_responses表添加模型配置id和tab页标签
+- 交易计划前端展示优化
+- <br />
+- 主页介绍仿站 [PnLClaw - Crypto Quantitative Trading Platform](https://www.pnlclaw.com/)
+- 主页介绍仿站[ ](https://www.pnlclaw.com/)[LUCKYQUANT PRO](https://luckyquant.top/)
+- 微信扫码登录
+- token长时间未自动刷新
+- <br />
 
 ## 后端
 
@@ -43,11 +45,19 @@
 - ✅响应的结果截取
 - ✅新增修改提示词需要给默认租户
 - ✅定时任务修改接口
-- ai\_responses表添加model\_api\_configs表中的id字段
-- model\_api\_configs 模型是否启用功能
+- ✅服务器部署.md
+- model\_api\_configs表添加tab页标签（期货、期权、新闻、持仓）和tab页标签模型是否启用
+- ai\_responses表添加model\_api\_name和model\_api\_id两个字段（对应model\_api\_configs表的id和name）
+- 根据ai\_responses表新增期权、新闻、持仓3张新表
+- 后端完成ai response后sse通知前端刷新界面
+- 交易计划表设计和功能实现
+- model\_api\_configs表tab\_tag + tab\_enable 兼容字段删除
+- 定时任务跑多个无法运行
+- 股票模块，中金所4个，国债4个
+- <br />
 - 租户相互之间数据隔离
 - ai\_responses表按天分表
-- 服务器部署.md
+- <br />
 
 <br />
 

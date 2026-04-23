@@ -156,11 +156,15 @@ func (h *ScheduleHandler) UpdateConfig(c *gin.Context) {
 		return
 	}
 
+	// 标准化 tab_tag
+	config.TabTag = models.NormalizeTabTag(config.TabTag)
+
 	// 更新配置
 	updateData := map[string]interface{}{
 		"name":        config.Name,
 		"cron_expr":   config.CronExpr,
 		"template_id": config.TemplateID,
+		"tab_tag":     config.TabTag,
 		"status":      config.Status,
 	}
 

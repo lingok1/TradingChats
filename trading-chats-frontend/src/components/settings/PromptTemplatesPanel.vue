@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import type { GenerateAIRequest, PromptTemplate } from '../../api/types'
-import { createPromptTemplate, deletePromptTemplate, getPromptTemplates, updatePromptTemplate, generatePrompt } from '../../api/promptTemplates'
+import {
+  createPromptTemplate,
+  deletePromptTemplate,
+  generatePrompt,
+  getPromptTemplates,
+  updatePromptTemplate,
+} from '../../api/promptTemplates'
 import { generateAIResponses } from '../../api/aiResponses'
+import { highlightKeyword, matchesKeyword } from '../../utils/search'
 import GenerateDialog from '../GenerateDialog.vue'
 
 const props = defineProps<{
@@ -13,24 +20,25 @@ const props = defineProps<{
 
 const loading = ref(false)
 const list = ref<PromptTemplate[]>([])
+const inputKeyword = ref('')
+const appliedKeyword = ref('')
 
 const currentPage = ref(1)
 const pageSize = ref(10)
 
+const filteredList = computed(() => {
+  if (!appliedKeyword.value) {
+    return list.value
+  }
+
+  return list.value.filter((item) => matchesKeyword([item.name, item.tags || []], appliedKeyword.value))
+})
+
 const currentList = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
-  return list.value.slice(start, end)
+  return filteredList.value.slice(start, end)
 })
-
-function handleSizeChange(size: number) {
-  pageSize.value = size
-  currentPage.value = 1
-}
-
-function handleCurrentChange(current: number) {
-  currentPage.value = current
-}
 
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
@@ -48,6 +56,33 @@ const form = reactive({
 })
 
 const dialogTitle = computed(() => (editingId.value ? '编辑模板' : '新建模板'))
+const paginationLayout = computed(() =>
+  props.mobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper',
+)
+
+function handleSizeChange(size: number) {
+  pageSize.value = size
+  currentPage.value = 1
+}
+
+function handleCurrentChange(current: number) {
+  currentPage.value = current
+}
+
+function runSearch() {
+  appliedKeyword.value = inputKeyword.value.trim()
+  currentPage.value = 1
+}
+
+function clearSearch() {
+  inputKeyword.value = ''
+  appliedKeyword.value = ''
+  currentPage.value = 1
+}
+
+function highlightText(value: string) {
+  return highlightKeyword(value, appliedKeyword.value)
+}
 
 function resetForm() {
   form.name = ''
@@ -59,8 +94,8 @@ function resetForm() {
 function tagsArray() {
   return form.tagsText
     .split(',')
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
 }
 
 async function copyGeneratedResult() {
@@ -100,8 +135,12 @@ async function refresh() {
   loading.value = true
   try {
     list.value = await getPromptTemplates()
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+    const maxPage = Math.max(1, Math.ceil(filteredList.value.length / pageSize.value))
+    if (currentPage.value > maxPage) {
+      currentPage.value = maxPage
+    }
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     loading.value = false
   }
@@ -142,8 +181,8 @@ async function submit() {
     }
     dialogOpen.value = false
     await refresh()
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     loading.value = false
   }
@@ -160,8 +199,8 @@ async function onGeneratePrompt(req: GenerateAIRequest) {
     generatedResult.value = prompt
     resultDialogOpen.value = true
     generateOpen.value = false
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     generateLoading.value = false
   }
@@ -173,8 +212,8 @@ async function onBatchSubmit(req: GenerateAIRequest) {
     const res = await generateAIResponses(req)
     ElMessage.success(`批次测试已提交，批次号：${res.batch_id}`)
     generateOpen.value = false
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     batchLoading.value = false
   }
@@ -183,8 +222,9 @@ async function onBatchSubmit(req: GenerateAIRequest) {
 async function remove(row: PromptTemplate) {
   const id = row.id
   if (!id) return
+
   try {
-    await ElMessageBox.confirm(`确认删除模板「${row.name}」？`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(`确认删除模板“${row.name}”？`, '提示', { type: 'warning' })
   } catch {
     return
   }
@@ -194,8 +234,8 @@ async function remove(row: PromptTemplate) {
     await deletePromptTemplate(id)
     ElMessage.success('已删除')
     await refresh()
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
     loading.value = false
   }
@@ -210,35 +250,53 @@ onMounted(() => {
   <div>
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
       <div style="font-weight: 600">提示词模板</div>
-      <el-space :direction="mobile ? 'vertical' : 'horizontal'" :size="mobile ? 8 : 12">
-        <el-button size="small" @click="refresh" :loading="loading" title="刷新">
-          <template #icon><Refresh /></template>
-          刷新
+      <el-space :direction="props.mobile ? 'vertical' : 'horizontal'" :size="props.mobile ? 8 : 12">
+        <el-input
+          v-model="inputKeyword"
+          clearable
+          placeholder="搜索当前模板页"
+          :style="{ width: props.mobile ? '100%' : '220px' }"
+          @keyup.enter="runSearch"
+        />
+        <el-button size="small" title="搜索" @click="runSearch">
+          <template #icon><Search /></template>
+          搜索
         </el-button>
-        <el-button size="small" type="primary" @click="openCreate" title="新建">
+        <el-button size="small" title="清空搜索" @click="clearSearch">清空</el-button>
+        <el-button size="small" type="primary" title="新建" @click="openCreate">
           <template #icon><Plus /></template>
           新建
         </el-button>
-        <el-button size="small" type="success" @click="generateOpen = true" title="模板生成">
+        <el-button size="small" type="success" title="模板生成" @click="generateOpen = true">
           <template #icon><Plus /></template>
           模板生成
+        </el-button>
+        <el-button size="small" :loading="loading" title="刷新" @click="refresh">
+          <template #icon><Refresh /></template>
+          刷新
         </el-button>
       </el-space>
     </div>
 
     <div style="max-height: 400px; overflow-y: auto; padding-right: 8px; margin-bottom: 12px;">
       <el-table :data="currentList" style="width: 100%; margin-top: 12px" size="small" :loading="loading">
-        <el-table-column prop="name" label="名称" :min-width="mobile ? 100 : 140" />
-        <el-table-column label="标签" :min-width="mobile ? 100 : 140">
+        <el-table-column label="名称" :min-width="props.mobile ? 100 : 140">
+          <template #default="scope">
+            <span v-html="highlightText(scope.row.name)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="标签" :min-width="props.mobile ? 100 : 140">
           <template #default="scope">
             <el-space wrap :size="6">
-              <el-tag v-for="t in scope.row.tags" :key="t" size="small">{{ t }}</el-tag>
+              <el-tag v-for="tag in scope.row.tags" :key="tag" size="small">
+                <span v-html="highlightText(tag)" />
+              </el-tag>
             </el-space>
           </template>
         </el-table-column>
-        <el-table-column label="操作" :width="mobile ? 120 : 150" fixed="right">
+        <el-table-column label="操作" :width="props.mobile ? 120 : 150" fixed="right">
           <template #default="scope">
-            <el-space :direction="mobile ? 'vertical' : 'horizontal'" :size="4">
+            <el-space :direction="props.mobile ? 'vertical' : 'horizontal'" :size="4">
               <el-button size="small" text type="primary" @click="openEdit(scope.row)">编辑</el-button>
               <el-button size="small" text type="danger" @click="remove(scope.row)">删除</el-button>
             </el-space>
@@ -246,20 +304,20 @@ onMounted(() => {
         </el-table-column>
       </el-table>
     </div>
-    
+
     <el-pagination
       v-model:current-page="currentPage"
       v-model:page-size="pageSize"
       :page-sizes="[5, 10, 20, 50]"
-      :small="mobile"
-      :layout="mobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper'"
-      :total="list.length"
+      :small="props.mobile"
+      :layout="paginationLayout"
+      :total="filteredList.length"
       @size-change="handleSizeChange"
       @current-change="handleCurrentChange"
       style="margin-top: 12px; justify-content: center"
     />
 
-    <el-dialog v-model="dialogOpen" :title="dialogTitle" :width="mobile ? '90%' : '680px'" @closed="resetForm">
+    <el-dialog v-model="dialogOpen" :title="dialogTitle" :width="props.mobile ? '90%' : '680px'" @closed="resetForm">
       <el-form label-position="top">
         <el-form-item label="ID" v-if="editingId">
           <el-input v-model="editingId" disabled />
@@ -271,7 +329,7 @@ onMounted(() => {
           <el-input v-model="form.tagsText" placeholder="例如：期货, 风险监控" />
         </el-form-item>
         <el-form-item label="内容">
-          <el-input v-model="form.content" type="textarea" :rows="mobile ? 6 : 10" />
+          <el-input v-model="form.content" type="textarea" :rows="props.mobile ? 6 : 10" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -282,16 +340,16 @@ onMounted(() => {
       </template>
     </el-dialog>
 
-    <GenerateDialog 
-      v-model="generateOpen" 
-      :loading="generateLoading" 
+    <GenerateDialog
+      v-model="generateOpen"
+      :loading="generateLoading"
       :batch-loading="batchLoading"
-      :mobile="mobile" 
-      @submit="onGeneratePrompt" 
+      :mobile="props.mobile"
+      @submit="onGeneratePrompt"
       @batch-submit="onBatchSubmit"
     />
 
-    <el-dialog v-model="resultDialogOpen" title="生成结果" :width="mobile ? '90%' : '720px'">
+    <el-dialog v-model="resultDialogOpen" title="生成结果" :width="props.mobile ? '90%' : '720px'">
       <div style="background: var(--el-fill-color-light); padding: 16px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 50vh; overflow-y: auto;">
         {{ generatedResult }}
       </div>
