@@ -6,7 +6,7 @@ export type ApiResponse<T> = {
 
 export type TimeLike = string | number | null | undefined | Record<string, unknown>
 
-export type TabTag = 'futures' | 'options' | 'news' | 'position'
+export type TabTag = 'futures' | 'options' | 'stock' | 'news' | 'position'
 
 export type AIResponse = {
   id?: string
@@ -99,7 +99,7 @@ export type TradePlanStatus = 'planned' | 'active' | 'closed' | 'cancelled'
 export type TradePlan = {
   id?: string
   tenant_id?: string
-  tab_tag: 'futures' | 'options'
+  tab_tag: 'futures' | 'options' | 'stock'
   name: string
   symbol: string
   strategy: string

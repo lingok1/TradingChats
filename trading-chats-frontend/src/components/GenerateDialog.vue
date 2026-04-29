@@ -34,6 +34,7 @@ const templatesLoading = ref(false)
 const tabOptions: Array<{ label: string; value: NonNullable<GenerateAIRequest['tab_tag']> }> = [
   { label: '期货', value: 'futures' },
   { label: '期权', value: 'options' },
+  { label: '股票', value: 'stock' },
   { label: '新闻', value: 'news' },
   { label: '持仓', value: 'position' },
 ]

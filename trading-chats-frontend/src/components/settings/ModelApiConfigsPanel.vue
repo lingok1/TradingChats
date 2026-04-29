@@ -60,6 +60,7 @@ const TEXT = {
   placeholderModels: '例如：gpt-5.4, qwen3.5-plus',
   tabFutures: '期货',
   tabOptions: '期权',
+  tabStock: '股票',
   tabNews: '新闻',
   tabPosition: '持仓',
 } as const
@@ -67,6 +68,7 @@ const TEXT = {
 const tabOptions: Array<{ label: string; value: TabTag }> = [
   { label: TEXT.tabFutures, value: 'futures' },
   { label: TEXT.tabOptions, value: 'options' },
+  { label: TEXT.tabStock, value: 'stock' },
   { label: TEXT.tabNews, value: 'news' },
   { label: TEXT.tabPosition, value: 'position' },
 ]

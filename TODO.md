@@ -18,69 +18,48 @@
 - ✅移动端将菜单切换放到后面，用户登录放到前面
 - ✅刷新按钮放到main里面
 - ✅右下角默认显示明暗切换，明暗切换和返回顶部放一起，顶部上明暗下
-- 定时刷新页面，根据系统配置来刷新
-- 后端完成ai response后sse通知前端刷新界面
-- 顶部标签页切换后获取最新数据
-- 参数，模型等添加搜索
-- 模型的启用禁用
-- 期权调用全部AI，新闻调用一个就够了
-- 期权和新闻提示词
-- 内容表格右滑，显示品种
-- 模型列表变长一点，样式可以重新设计
-- 定时任务日志不显示还是单独一张表存储prompt
-- 交易计划前端展示优化
-- <br />
-- 主页介绍仿站 [PnLClaw - Crypto Quantitative Trading Platform](https://www.pnlclaw.com/)
-- 主页介绍仿站[ ](https://www.pnlclaw.com/)[LUCKYQUANT PRO](https://luckyquant.top/)
+- ✅移动端，颜色为灰色，需要为白色更清晰
+- ✅最近刷新和成功刷新放在一行
+- ✅关于，文字打字机的效果
+- ✅定时刷新页面，根据系统配置来刷新
+- ✅后端完成ai response后sse通知前端刷新界面
+- ✅顶部标签页切换后获取最新数据
+- ✅参数，模型等添加搜索
+- ✅模型的启用禁用
+- ✅期权调用全部AI，新闻调用一个就够了
+- ✅期权和新闻提示词
+- ✅内容表格右滑，显示品种(弃用)
+- ✅模型列表变长一点，样式可以重新设计
+- ✅定时任务日志不显示还是单独一张表存储prompt
+- ✅交易计划前端展示优化
+- ✅主页介绍仿站 [PnLClaw - Crypto Quantitative Trading Platform](https://www.pnlclaw.com/)
+- ✅主页介绍仿站[ ](https://www.pnlclaw.com/)[LUCKYQUANT PRO](https://luckyquant.top/)
+- ✅移动端，设置重新设计，提醒用户左右滑动快速切换（弃用）
+- ✅前端icon修改
+- ✅移动端顶部（凌期ai旁边）添加当前界面
+- 股票模块提示词，中金所4个，国债4个
 - 微信扫码登录
 - token长时间未自动刷新
-- <br />
+- 
 
 ## 后端
 
-- ✅ai\_responses表里面的prompt字段放到schedule\_logs表里面，schedule\_logs表添加字段区分是手动触发还是自动触发的任务
-- ✅schedule\_configs表删除param1和param2，executeTask从system\_configs表里面获取param1和param2的数据
+- ✅ai_responses表里面的prompt字段放到schedule_logs表里面，schedule_logs表添加字段区分是手动触发还是自动触发的任务
+- ✅schedule_configs表删除param1和param2，executeTask从system_configs表里面获取param1和param2的数据
 - ✅开启定时任务后不会定时运行
 - ✅添加登录鉴权和多租户功能，修改和删除的接口需要进行鉴权操作，更新swagger接口文档，添加一个管理员和两个租户，给默认的账号密码
 - ✅响应的结果截取
 - ✅新增修改提示词需要给默认租户
 - ✅定时任务修改接口
 - ✅服务器部署.md
-- model\_api\_configs表添加tab页标签（期货、期权、新闻、持仓）和tab页标签模型是否启用
-- ai\_responses表添加model\_api\_name和model\_api\_id两个字段（对应model\_api\_configs表的id和name）
-- 根据ai\_responses表新增期权、新闻、持仓3张新表
-- 后端完成ai response后sse通知前端刷新界面
-- 交易计划表设计和功能实现
-- model\_api\_configs表tab\_tag + tab\_enable 兼容字段删除
-- 定时任务跑多个无法运行
-- 股票模块，中金所4个，国债4个
-- <br />
+- ✅model_api_configs表添加tab页标签（期货、期权、新闻、持仓）和tab页标签模型是否启用
+- ✅ai_responses表添加model_api_name和model_api_id两个字段（对应model_api_configs表的id和name）
+- ✅根据ai_responses表新增期权、新闻、持仓3张新表
+- ✅后端完成ai response后sse通知前端刷新界面
+- ✅交易计划表设计和功能实现
+- ✅定时任务跑多个无法运行（时区原因）
+- ✅model_api_configs表tab_tag + tab_enable 兼容字段删除
 - 租户相互之间数据隔离
-- ai\_responses表按天分表
-- <br />
+- ai_responses表按天分表
+- 
 
-<br />
-
-## 关于功能页设计
-
-AI辅助个人投资者期货期权交易获得盈利
-
-### 期货
-
-在日间和夜盘定时5分钟分析90个期货品种给出个人投资者建议，供投资者进行参考。
-
-### 期权
-
-在日间和夜盘定时10分钟分析期权品种给出个人投资者建议。
-
-### 新闻
-
-实时追踪期货期权市场动态，把握投资先机。
-
-### 计划
-
-### \*\*计划你的交易，交易你的计划，制定期货期权交易计划，克服人性弱点，建立交易的一致性，提高决策效率，减轻心理压力。
-
-### 持仓
-
-ai给出持仓分析和建议，可通过图片导入和手动添加期货期权持仓。

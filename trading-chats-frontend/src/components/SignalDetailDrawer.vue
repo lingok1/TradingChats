@@ -42,7 +42,9 @@ function getValue(keys: string[]): string {
     v-model="open"
     :title="title"
     :direction="mobile ? 'btt' : 'rtl'"
+    :modal="!mobile"
     :size="mobile ? '85%' : '520px'"
+    class="tc-signal-detail-drawer"
   >
     <div v-if="row">
       <el-descriptions :column="1" border>
@@ -92,6 +94,33 @@ function getValue(keys: string[]): string {
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.6;
+}
+
+.tc-signal-detail-drawer :deep(.el-drawer__body),
+.tc-signal-detail-drawer :deep(.el-collapse),
+.tc-signal-detail-drawer :deep(.el-collapse-item__header),
+.tc-signal-detail-drawer :deep(.el-collapse-item__wrap),
+.tc-signal-detail-drawer :deep(.el-descriptions__body),
+.tc-signal-detail-drawer :deep(.el-descriptions__cell) {
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+}
+
+:global(.tc-signal-detail-drawer .el-drawer__body),
+:global(.tc-signal-detail-drawer .el-collapse),
+:global(.tc-signal-detail-drawer .el-collapse-item__header),
+:global(.tc-signal-detail-drawer .el-collapse-item__wrap),
+:global(.tc-signal-detail-drawer .el-descriptions__body),
+:global(.tc-signal-detail-drawer .el-descriptions__cell) {
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+}
+
+:global(.tc-signal-detail-drawer .el-descriptions__label.el-descriptions__cell.is-bordered-label),
+:global(.tc-signal-detail-drawer .el-descriptions__content.el-descriptions__cell.is-bordered-content) {
+  background: var(--el-bg-color);
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-primary);
 }
 </style>
 

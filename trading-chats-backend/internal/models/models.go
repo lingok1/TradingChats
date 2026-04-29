@@ -7,6 +7,7 @@ import (
 const (
 	TabTagFutures  = "futures"
 	TabTagOptions  = "options"
+	TabTagStock    = "stock"
 	TabTagNews     = "news"
 	TabTagPosition = "position"
 )
@@ -15,6 +16,8 @@ func NormalizeTabTag(tabTag string) string {
 	switch tabTag {
 	case TabTagOptions:
 		return TabTagOptions
+	case TabTagStock:
+		return TabTagStock
 	case TabTagNews:
 		return TabTagNews
 	case TabTagPosition:
@@ -30,6 +33,8 @@ func AIResponseCollectionName(tabTag string) string {
 	switch NormalizeTabTag(tabTag) {
 	case TabTagOptions:
 		return "ai_responses_options"
+	case TabTagStock:
+		return "ai_responses_stock"
 	case TabTagNews:
 		return "ai_responses_news"
 	case TabTagPosition:

@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Icon } from '@iconify/vue'
+import chartAreasplineVariantIcon from '@iconify-icons/mdi/chart-areaspline-variant'
+import chartLineIcon from '@iconify-icons/mdi/chart-line'
+import calendarMonthOutlineIcon from '@iconify-icons/mdi/calendar-month-outline'
+import newspaperVariantOutlineIcon from '@iconify-icons/mdi/newspaper-variant-outline'
+import financeIcon from '@iconify-icons/mdi/finance'
+import informationOutlineIcon from '@iconify-icons/mdi/information-outline'
+import menuIcon from '@iconify-icons/mdi/menu'
+import walletOutlineIcon from '@iconify-icons/mdi/wallet-outline'
 import {
   Moon,
   Sunny,
-  DataAnalysis,
-  Position,
-  Notification,
   Refresh,
-  Menu,
   ArrowUp,
   Calendar,
-  PieChart,
-  InfoFilled,
   User,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -41,6 +44,10 @@ const TAB_META: Record<AppTab, { title: string; description: string }> = {
     title: '期权',
     description: '展示期权页最近一批 AI 分析结果。',
   },
+  stock: {
+    title: '股票',
+    description: '展示股票页最近一批 AI 分析结果。',
+  },
   news: {
     title: '新闻',
     description: '展示新闻页最近一批 AI 分析结果。',
@@ -59,8 +66,25 @@ const TAB_META: Record<AppTab, { title: string; description: string }> = {
   },
 }
 
-const NAV_TABS: AppTab[] = ['futures', 'options', 'news', 'plan', 'position', 'about']
-const ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'news', 'position']
+const NAV_TABS: AppTab[] = ['futures', 'options', 'stock', 'news', 'plan', 'position', 'about']
+const ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'stock', 'news', 'position']
+const futuresIcon = chartLineIcon
+const optionsIcon = chartAreasplineVariantIcon
+const stockIcon = financeIcon
+const newsIcon = newspaperVariantOutlineIcon
+const planIcon = calendarMonthOutlineIcon
+const positionIcon = walletOutlineIcon
+const aboutIcon = informationOutlineIcon
+const mobileMenuIcon = menuIcon
+const TAB_ICONS: Record<AppTab, typeof futuresIcon> = {
+  futures: futuresIcon,
+  options: optionsIcon,
+  stock: stockIcon,
+  news: newsIcon,
+  plan: planIcon,
+  position: positionIcon,
+  about: aboutIcon,
+}
 const authStorageKey = 'tc_auth'
 const scrollThreshold = 200
 const eventReconnectDelay = 3000
@@ -82,6 +106,7 @@ const refreshToken = ref('')
 const currentUsername = ref('')
 
 const showBackToTop = ref(false)
+const headerFloating = ref(false)
 const settingsOpen = ref(false)
 const loading = ref(false)
 const errorText = ref('')
@@ -99,6 +124,7 @@ const sseConnected = ref(false)
 let eventSource: EventSource | null = null
 let reconnectTimer: number | null = null
 let refreshTimer: number | null = null
+let eventStartTimer: number | null = null
 
 function isAnalysisTab(tab: string): tab is TabTag {
   return ANALYSIS_TABS.includes(tab as TabTag)
@@ -108,6 +134,7 @@ const isLoggedIn = computed(() => accessToken.value.length > 0)
 const isAnalysisView = computed(() => isAnalysisTab(activeTab.value))
 const currentAnalysisTab = computed<TabTag>(() => (isAnalysisTab(activeTab.value) ? activeTab.value : 'futures'))
 const currentTabMeta = computed(() => TAB_META[activeTab.value] ?? TAB_META.futures)
+const currentHeaderIcon = computed(() => TAB_ICONS[activeTab.value] ?? futuresIcon)
 
 const renderableResponses = computed(() =>
   responses.value.filter(
@@ -131,6 +158,7 @@ const modelGroups = computed(() =>
 
 function handleScroll() {
   showBackToTop.value = window.scrollY > scrollThreshold
+  headerFloating.value = window.scrollY > 0
 }
 
 function scrollToTop() {
@@ -184,6 +212,11 @@ function handleTabChange(tab: { props: { name: string } }) {
 
 function handleMobileTabChange(tabName: AppTab) {
   activeTab.value = tabName
+  mobileMenuOpen.value = false
+}
+
+function handleBrandClick() {
+  activeTab.value = 'futures'
   mobileMenuOpen.value = false
 }
 
@@ -246,11 +279,38 @@ function clearReconnectTimer() {
   }
 }
 
+function clearEventStartTimer() {
+  if (eventStartTimer !== null) {
+    window.clearTimeout(eventStartTimer)
+    eventStartTimer = null
+  }
+}
+
+function startEventStreamAfterPageLoad(tab: TabTag) {
+  clearEventStartTimer()
+
+  const openStream = () => {
+    eventStartTimer = null
+    if (isAnalysisView.value && currentAnalysisTab.value === tab) {
+      startEventStream(tab)
+    }
+  }
+
+  if (document.readyState === 'complete') {
+    eventStartTimer = window.setTimeout(openStream, 0)
+    return
+  }
+
+  window.addEventListener('load', () => {
+    eventStartTimer = window.setTimeout(openStream, 0)
+  }, { once: true })
+}
+
 function scheduleEventReconnect(tab: TabTag) {
   clearReconnectTimer()
   reconnectTimer = window.setTimeout(() => {
     reconnectTimer = null
-    if (currentAnalysisTab.value === tab) {
+    if (isAnalysisView.value && currentAnalysisTab.value === tab) {
       startEventStream(tab)
     }
   }, eventReconnectDelay)
@@ -259,6 +319,7 @@ function scheduleEventReconnect(tab: TabTag) {
 function stopEventStream() {
   sseConnected.value = false
   clearReconnectTimer()
+  clearEventStartTimer()
   if (eventSource) {
     eventSource.close()
     eventSource = null
@@ -356,12 +417,20 @@ onMounted(() => {
 
   void loadSystemConfig()
   void loadLatest(currentAnalysisTab.value)
-  startEventStream(currentAnalysisTab.value)
+  startEventStreamAfterPageLoad(currentAnalysisTab.value)
 })
 
-watch(currentAnalysisTab, (tab) => {
+watch(activeTab, (tab) => {
+  if (!isAnalysisTab(tab)) {
+    responses.value = []
+    errorText.value = ''
+    loading.value = false
+    stopEventStream()
+    return
+  }
+
   void loadLatest(tab)
-  startEventStream(tab)
+  startEventStreamAfterPageLoad(tab)
 })
 
 onUnmounted(() => {
@@ -376,18 +445,18 @@ onUnmounted(() => {
 
 <template>
   <el-container class="tc-root">
-    <el-header class="tc-header">
-      <div class="tc-header-left">
+    <el-header class="tc-header" :class="{ floating: headerFloating }">
+      <button class="tc-header-left tc-brand-button" type="button" title="返回期货" @click="handleBrandClick">
         <img v-if="systemLogo" :src="systemLogo" alt="Logo" class="tc-logo" />
         <div class="tc-title">{{ systemTitle }}</div>
-      </div>
+      </button>
 
       <div v-if="!isMobile" class="tc-header-tabs">
         <el-tabs v-model="activeTab" class="ogo-tabs" @tab-click="(tab: any) => handleTabChange(tab)">
           <el-tab-pane name="futures">
             <template #label>
               <div class="ogo-tabs-tab-btn">
-                <div class="ogo-tabs-icon"><DataAnalysis /></div>
+                <div class="ogo-tabs-icon"><Icon :icon="futuresIcon" class="nav-icon" /></div>
                 <span class="ogo-tabs-text">期货</span>
               </div>
             </template>
@@ -395,15 +464,23 @@ onUnmounted(() => {
           <el-tab-pane name="options">
             <template #label>
               <div class="ogo-tabs-tab-btn">
-                <div class="ogo-tabs-icon"><PieChart /></div>
+                <div class="ogo-tabs-icon"><Icon :icon="optionsIcon" class="nav-icon" /></div>
                 <span class="ogo-tabs-text">期权</span>
+              </div>
+            </template>
+          </el-tab-pane>
+          <el-tab-pane name="stock">
+            <template #label>
+              <div class="ogo-tabs-tab-btn">
+                <div class="ogo-tabs-icon"><Icon :icon="stockIcon" class="nav-icon" /></div>
+                <span class="ogo-tabs-text">股票</span>
               </div>
             </template>
           </el-tab-pane>
           <el-tab-pane name="news">
             <template #label>
               <div class="ogo-tabs-tab-btn">
-                <div class="ogo-tabs-icon"><Notification /></div>
+                <div class="ogo-tabs-icon"><Icon :icon="newsIcon" class="nav-icon" /></div>
                 <span class="ogo-tabs-text">新闻</span>
               </div>
             </template>
@@ -419,7 +496,7 @@ onUnmounted(() => {
           <el-tab-pane name="position">
             <template #label>
               <div class="ogo-tabs-tab-btn">
-                <div class="ogo-tabs-icon"><Position /></div>
+                <div class="ogo-tabs-icon"><Icon :icon="positionIcon" class="nav-icon" /></div>
                 <span class="ogo-tabs-text">持仓</span>
               </div>
             </template>
@@ -427,7 +504,7 @@ onUnmounted(() => {
           <el-tab-pane name="about">
             <template #label>
               <div class="ogo-tabs-tab-btn">
-                <div class="ogo-tabs-icon"><InfoFilled /></div>
+                <div class="ogo-tabs-icon"><Icon :icon="aboutIcon" class="nav-icon" /></div>
                 <span class="ogo-tabs-text">关于</span>
               </div>
             </template>
@@ -435,12 +512,17 @@ onUnmounted(() => {
         </el-tabs>
       </div>
 
+      <div v-if="isMobile" class="tc-header-current-page">
+        <Icon :icon="currentHeaderIcon" class="header-page-icon" />
+        <span class="tc-header-current-page-text">{{ currentTabMeta.title }}</span>
+      </div>
+
       <div class="tc-header-right">
         <el-button circle title="设置" @click="handleSettingsClick">
           <el-icon><User /></el-icon>
         </el-button>
         <el-button v-if="isMobile" circle title="菜单" @click="mobileMenuOpen = !mobileMenuOpen">
-          <el-icon><Menu /></el-icon>
+          <Icon :icon="mobileMenuIcon" class="header-action-icon" />
         </el-button>
       </div>
     </el-header>
@@ -456,12 +538,13 @@ onUnmounted(() => {
           @click="handleMobileTabChange(tab)"
         >
           <div class="tc-mobile-menu-icon">
-            <DataAnalysis v-if="tab === 'futures'" />
-            <PieChart v-else-if="tab === 'options'" />
-            <Notification v-else-if="tab === 'news'" />
+            <Icon v-if="tab === 'futures'" :icon="futuresIcon" class="nav-icon" />
+            <Icon v-else-if="tab === 'options'" :icon="optionsIcon" class="nav-icon" />
+            <Icon v-else-if="tab === 'stock'" :icon="stockIcon" class="nav-icon" />
+            <Icon v-else-if="tab === 'news'" :icon="newsIcon" class="nav-icon" />
             <Calendar v-else-if="tab === 'plan'" />
-            <Position v-else-if="tab === 'position'" />
-            <InfoFilled v-else />
+            <Icon v-else-if="tab === 'position'" :icon="positionIcon" class="nav-icon" />
+            <Icon v-else :icon="aboutIcon" class="nav-icon" />
           </div>
           <span class="tc-mobile-menu-text">{{ TAB_META[tab].title }}</span>
         </div>
@@ -472,13 +555,13 @@ onUnmounted(() => {
       <template v-if="isAnalysisView">
         <div class="tc-toolbar">
           <div class="tc-toolbar-meta">
-            <div class="tc-time">最近数据时间：{{ batchCreatedAt || '-' }}</div>
+            <div class="tc-time">{{ isMobile ? '数据更新：' : '最近数据时间：' }}{{ batchCreatedAt || '-' }}</div>
           </div>
           <div class="tc-toolbar-actions">
             <el-tag :type="sseConnected ? 'success' : 'info'">
-              {{ sseConnected ? '实时刷新已连接' : '实时刷新重连中' }}
+              {{ isMobile ? (sseConnected ? '已连接' : '重连中') : (sseConnected ? '实时刷新已连接' : '实时刷新重连中') }}
             </el-tag>
-            <el-tag type="success">成功 {{ successCount }}/{{ totalCount }}</el-tag>
+            <el-tag type="success">{{ isMobile ? `完成${successCount}/${totalCount}` : `成功 ${successCount}/${totalCount}` }}</el-tag>
             <el-button circle title="刷新数据" :loading="loading" @click="loadLatest()">
               <el-icon><Refresh /></el-icon>
             </el-button>
@@ -539,7 +622,7 @@ onUnmounted(() => {
         </p>
       </div>
       <div>© 2026 Trading Chats</div>
-      <div>当前页支持期货 / 期权 / 新闻 / 持仓实时刷新</div>
+      <div>当前页支持期货 / 期权 / 股票 / 新闻 / 持仓实时刷新</div>
     </footer>
 
     <SettingsDrawer
@@ -592,13 +675,26 @@ onUnmounted(() => {
 }
 
 .tc-header {
+  position: sticky;
+  top: 0;
+  z-index: 9;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 0 16px;
   border-bottom: 1px solid var(--el-border-color-light);
-  background: var(--el-bg-color);
+  background: color-mix(in srgb, var(--el-bg-color) 94%, transparent);
+  backdrop-filter: blur(12px);
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.tc-header.floating {
+  border-bottom-color: transparent;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
 
 .tc-header-left,
@@ -607,6 +703,23 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+}
+
+.tc-brand-button {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tc-brand-button:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 .tc-header-tabs {
@@ -620,13 +733,45 @@ onUnmounted(() => {
   object-fit: contain;
 }
 
+.header-action-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.tc-header-current-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.header-page-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.tc-header-current-page-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tc-title {
   font-size: 18px;
   font-weight: 700;
 }
 
 .tc-main {
-  background: var(--el-bg-color-page);
+  background: var(--el-bg-color);
 }
 
 .tc-toolbar {
@@ -745,6 +890,11 @@ onUnmounted(() => {
   height: 18px;
 }
 
+.nav-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .ogo-tabs-text {
   font-size: 14px;
   font-weight: 500;
@@ -759,11 +909,18 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   z-index: 20;
+  opacity: 0;
   pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease;
 }
 
 .tc-mobile-menu-container.open {
+  opacity: 1;
   pointer-events: auto;
+  visibility: visible;
 }
 
 .tc-mobile-menu-overlay {
@@ -906,6 +1063,65 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .tc-header {
     padding: 0 12px;
+    gap: 8px;
+  }
+
+  .tc-header-left {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .tc-title {
+    max-width: 32vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tc-header-current-page {
+    flex: 1 1 auto;
+    max-width: 96px;
+  }
+
+  .tc-header-right {
+    gap: 8px;
+  }
+
+  .tc-toolbar {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .tc-toolbar-meta {
+    flex: 0 0 auto;
+  }
+
+  .tc-toolbar-actions {
+    flex: 1;
+    justify-content: flex-end;
+    gap: 4px;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .tc-time {
+    margin-top: 0;
+    font-size: 12px;
+    line-height: 24px;
+    white-space: nowrap;
+  }
+
+  .tc-toolbar-actions :deep(.el-tag) {
+    height: 24px;
+    padding: 0 6px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .tc-toolbar-actions :deep(.el-button.is-circle) {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
   }
 
   .tc-title {

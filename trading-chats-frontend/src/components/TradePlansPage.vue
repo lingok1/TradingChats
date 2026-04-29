@@ -18,6 +18,7 @@ const emit = defineEmits<{
 const planTabs: Array<{ label: string; value: TradePlan['tab_tag'] }> = [
   { label: '期货计划', value: 'futures' },
   { label: '期权计划', value: 'options' },
+  { label: '股票计划', value: 'stock' },
 ]
 
 const statusOptions: Array<{ label: string; value: TradePlanStatus }> = [
@@ -49,6 +50,21 @@ const form = reactive<TradePlan>({
 })
 
 const dialogTitle = computed(() => (editingId.value ? '编辑交易计划' : '新建交易计划'))
+const symbolLabel = computed(() => (form.tab_tag === 'stock' ? '股票代码' : '合约代码'))
+const symbolColumnLabel = computed(() => (activeTab.value === 'stock' ? '股票' : '合约'))
+const symbolPlaceholder = computed(() => {
+  switch (form.tab_tag) {
+    case 'stock':
+      return '例如：600519 / AAPL'
+    case 'options':
+      return '例如：au2606C680'
+    default:
+      return '例如：au2606'
+  }
+})
+const strategyPlaceholder = computed(() =>
+  form.tab_tag === 'stock' ? '例如：趋势交易 / 回调买入 / 止损风控' : '例如：突破跟随 / 买入看涨期权',
+)
 const directionOptions = computed(() => {
   if (form.tab_tag === 'options') {
     return [
@@ -56,6 +72,12 @@ const directionOptions = computed(() => {
       { label: '看跌', value: 'bearish' },
       { label: '波动率多头', value: 'volatility_long' },
       { label: '波动率空头', value: 'volatility_short' },
+    ]
+  }
+  if (form.tab_tag === 'stock') {
+    return [
+      { label: '买入', value: 'buy' },
+      { label: '卖出', value: 'sell' },
     ]
   }
 
@@ -97,6 +119,16 @@ function getDirectionLabel(plan: Pick<TradePlan, 'tab_tag' | 'direction'>) {
         return plan.direction
     }
   }
+  if (plan.tab_tag === 'stock') {
+    switch (plan.direction) {
+      case 'buy':
+        return '买入'
+      case 'sell':
+        return '卖出'
+      default:
+        return plan.direction
+    }
+  }
 
   switch (plan.direction) {
     case 'long':
@@ -117,7 +149,7 @@ function resetForm(tabTag: TradePlan['tab_tag'] = activeTab.value) {
   form.name = ''
   form.symbol = ''
   form.strategy = ''
-  form.direction = tabTag === 'options' ? 'bullish' : 'long'
+  form.direction = tabTag === 'options' ? 'bullish' : tabTag === 'stock' ? 'buy' : 'long'
   form.entry_price = 0
   form.take_profit = 0
   form.stop_loss = 0
@@ -344,7 +376,7 @@ watch(activeTab, () => {
       </div>
 
       <el-table v-else :data="plans" size="small" :loading="loading" style="width: 100%">
-        <el-table-column prop="symbol" label="合约" :min-width="mobile ? 110 : 140" />
+        <el-table-column prop="symbol" :label="symbolColumnLabel" :min-width="mobile ? 110 : 140" />
         <el-table-column prop="strategy" label="策略" :min-width="mobile ? 100 : 140" show-overflow-tooltip />
         <el-table-column prop="direction" label="方向" :width="mobile ? 100 : 120">
           <template #default="scope">{{ getDirectionLabel(scope.row) }}</template>
@@ -398,11 +430,11 @@ watch(activeTab, () => {
             <el-option v-for="item in planTabs" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item label="合约代码">
-          <el-input v-model="form.symbol" placeholder="例如：au2606 / au2606C680" />
+        <el-form-item :label="symbolLabel">
+          <el-input v-model="form.symbol" :placeholder="symbolPlaceholder" />
         </el-form-item>
         <el-form-item label="策略说明">
-          <el-input v-model="form.strategy" placeholder="例如：突破跟随 / 买入看涨期权" />
+          <el-input v-model="form.strategy" :placeholder="strategyPlaceholder" />
         </el-form-item>
         <el-form-item label="方向">
           <el-select v-model="form.direction" style="width: 100%">

@@ -150,8 +150,8 @@ func (s *PromptTemplateService) GeneratePrompt(ctx context.Context, templateID s
 		}
 	}
 
-	prompt += fmt.Sprintf("\n\n当前北京时间: %s", beijingTime.Format("2006-01-02 15:04:05"))
-	prompt += fmt.Sprintf("\n开仓时间: %s", openTime.Format("2006-01-02 15:04:05"))
+	prompt += fmt.Sprintf("\n- 当前北京时间: %s"+"，开仓时间: %s", beijingTime.Format("2006-01-02 15:04:05"),openTime.Format("2006-01-02 15:04:05"))
+	
 
 	return prompt, nil
 }

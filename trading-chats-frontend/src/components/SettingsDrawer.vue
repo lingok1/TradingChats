@@ -22,7 +22,7 @@ const open = computed({
   set: (value: boolean) => emit('update:modelValue', value),
 })
 
-const drawerSize = computed(() => (props.mobile ? '420px' : '60%'))
+const drawerSize = computed(() => (props.mobile ? '420px' : '90%'))
 const active = ref<'system' | 'params' | 'templates' | 'models' | 'schedules'>('schedules')
 </script>
 

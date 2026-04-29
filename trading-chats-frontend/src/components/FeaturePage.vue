@@ -14,7 +14,17 @@ const robotGlareX = ref('50%')
 const robotGlareY = ref('18%')
 const tradeWords = ['buy', 'sell', 'call', 'put'] as const
 const floatingWords = ref<string[]>(shuffleTradeWords())
+const heroTitlePrimary = 'AI辅助'
+const heroTitleSecondary = '期货期权交易'
+const heroTitleProfit = '获得盈利'
+const heroFullTitle = `${heroTitlePrimary}${heroTitleSecondary}${heroTitleProfit}`
+const typedHeroTitle = ref('')
+const typewriterSpeed = 115
+const typewriterStartDelay = 320
+const typewriterLoopDelay = 1800
 let floatingWordsTimer: number | null = null
+let typewriterDelayTimer: number | null = null
+let typewriterTimer: number | null = null
 
 const robotStageStyle = computed(() => ({
   '--robot-tilt-x': robotTiltX.value,
@@ -23,11 +33,21 @@ const robotStageStyle = computed(() => ({
   '--robot-glare-y': robotGlareY.value,
 }))
 
+const typedHeroPrimary = computed(() => typedHeroTitle.value.slice(0, heroTitlePrimary.length))
+const typedHeroSecondary = computed(() =>
+  typedHeroTitle.value.slice(heroTitlePrimary.length, heroTitlePrimary.length + heroTitleSecondary.length),
+)
+const typedHeroProfit = computed(() =>
+  typedHeroTitle.value.slice(heroTitlePrimary.length + heroTitleSecondary.length),
+)
+
 onMounted(() => {
   // 页面加载后显示内容，添加淡入效果
   setTimeout(() => {
     isVisible.value = true
   }, 100)
+
+  startHeroTypewriter()
 
   floatingWordsTimer = window.setInterval(() => {
     floatingWords.value = shuffleTradeWords()
@@ -39,6 +59,8 @@ onUnmounted(() => {
     window.clearInterval(floatingWordsTimer)
     floatingWordsTimer = null
   }
+
+  stopHeroTypewriter()
 })
 
 function shuffleTradeWords() {
@@ -52,6 +74,46 @@ function shuffleTradeWords() {
 
 function handleSwitchToFutures() {
   emit('switch-to-futures')
+}
+
+function startHeroTypewriter() {
+  stopHeroTypewriter()
+  queueHeroTypewriterRound(typewriterStartDelay)
+}
+
+function stopHeroTypewriter() {
+  if (typewriterTimer !== null) {
+    window.clearInterval(typewriterTimer)
+    typewriterTimer = null
+  }
+
+  if (typewriterDelayTimer !== null) {
+    window.clearTimeout(typewriterDelayTimer)
+    typewriterDelayTimer = null
+  }
+}
+
+function queueHeroTypewriterRound(delay: number) {
+  typewriterDelayTimer = window.setTimeout(() => {
+    typewriterDelayTimer = null
+    runHeroTypewriterRound()
+  }, delay)
+}
+
+function runHeroTypewriterRound() {
+  typedHeroTitle.value = ''
+  let cursor = 0
+
+  typewriterTimer = window.setInterval(() => {
+    cursor += 1
+    typedHeroTitle.value = heroFullTitle.slice(0, cursor)
+
+    if (cursor >= heroFullTitle.length && typewriterTimer !== null) {
+      window.clearInterval(typewriterTimer)
+      typewriterTimer = null
+      queueHeroTypewriterRound(typewriterLoopDelay)
+    }
+  }, typewriterSpeed)
 }
 
 function handleRobotMove(event: MouseEvent) {
@@ -89,9 +151,16 @@ function getTradeWordTone(word: string) {
       <div class="hero-flow hero-flow-green"></div>
       <div class="hero-content">
         <div class="hero-text">
-          <h1 class="hero-title">
-            <span class="hero-title-primary">AI辅助</span>
-            <span class="hero-title-secondary">期货期权交易<span class="profit-text">获得盈利</span></span>
+          <h1 class="hero-title" :aria-label="heroFullTitle">
+            <span class="hero-title-primary">
+              {{ typedHeroPrimary }}
+              <span v-if="typedHeroPrimary.length < heroTitlePrimary.length" class="typewriter-caret" aria-hidden="true"></span>
+            </span>
+            <span class="hero-title-secondary">
+              {{ typedHeroSecondary }}
+              <span class="profit-text">{{ typedHeroProfit }}</span>
+              <span v-if="typedHeroPrimary.length >= heroTitlePrimary.length" class="typewriter-caret" aria-hidden="true"></span>
+            </span>
           </h1>
           <p class="hero-subtitle">智能分析市场动态，科学制定交易策略，让投资更专业、更高效</p>
           <div class="hero-buttons">
@@ -170,6 +239,11 @@ function getTradeWordTone(word: string) {
                   <stop offset="45%" stop-color="#66dfff" />
                   <stop offset="100%" stop-color="#19456b" />
                 </radialGradient>
+                <radialGradient id="robotEyeIris" cx="46%" cy="36%" r="68%">
+                  <stop offset="0%" stop-color="#ffffff" />
+                  <stop offset="32%" stop-color="#9ffff0" />
+                  <stop offset="100%" stop-color="#18a9ff" />
+                </radialGradient>
                 <filter id="robotGlowFilter" x="-60%" y="-60%" width="220%" height="220%">
                   <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#6cecff" flood-opacity="0.45" />
                 </filter>
@@ -179,41 +253,68 @@ function getTradeWordTone(word: string) {
               <ellipse cx="160" cy="488" rx="120" ry="26" fill="rgba(77, 159, 255, 0.08)" />
 
               <g class="robot-float">
-                <path d="M130 64 Q160 42 190 64" fill="none" stroke="url(#robotGlow)" stroke-width="8" stroke-linecap="round" />
-                <circle cx="160" cy="52" r="8" fill="#8affea" />
+                <g class="robot-head">
+                  <path d="M130 64 Q160 42 190 64" fill="none" stroke="url(#robotGlow)" stroke-width="8" stroke-linecap="round" />
+                  <circle cx="160" cy="52" r="8" fill="#8affea" />
 
-                <ellipse cx="160" cy="122" rx="70" ry="78" fill="rgba(104, 183, 255, 0.08)" filter="url(#robotGlowFilter)" />
-                <rect x="104" y="72" width="112" height="126" rx="52" fill="url(#robotChrome)" />
-                <path d="M112 98 Q160 70 208 96 V132 Q160 154 112 132 Z" fill="rgba(255,255,255,0.26)" />
-                <rect x="96" y="104" width="16" height="46" rx="8" fill="url(#robotChromeDark)" />
-                <rect x="208" y="104" width="16" height="46" rx="8" fill="url(#robotChromeDark)" />
-                <rect x="116" y="92" width="88" height="60" rx="30" fill="url(#robotGlass)" />
-                <path d="M128 103 H193" stroke="rgba(255,255,255,0.2)" stroke-width="4" stroke-linecap="round" />
-                <rect x="132" y="112" width="24" height="10" rx="5" fill="#8affea" filter="url(#robotGlowFilter)" />
-                <rect x="164" y="112" width="24" height="10" rx="5" fill="#8affea" filter="url(#robotGlowFilter)" />
-                <path d="M138 146 Q160 160 182 146" fill="none" stroke="url(#robotGlow)" stroke-width="6" stroke-linecap="round" />
-                <path d="M114 168 H206" stroke="rgba(255,255,255,0.24)" stroke-width="6" stroke-linecap="round" />
+                  <ellipse cx="160" cy="126" rx="74" ry="82" fill="rgba(104, 183, 255, 0.08)" filter="url(#robotGlowFilter)" />
+                  <path d="M105 122 Q105 79 160 70 Q215 79 215 122 Q215 169 188 190 Q160 209 132 190 Q105 169 105 122 Z" fill="url(#robotChrome)" />
+                  <path d="M118 101 Q160 77 202 101 V135 Q160 160 118 135 Z" fill="rgba(255,255,255,0.26)" />
+                  <path d="M97 116 Q96 137 105 154" fill="none" stroke="url(#robotChromeDark)" stroke-width="12" stroke-linecap="round" />
+                  <path d="M223 116 Q224 137 215 154" fill="none" stroke="url(#robotChromeDark)" stroke-width="12" stroke-linecap="round" />
+                  <rect x="116" y="96" width="88" height="60" rx="28" fill="url(#robotGlass)" />
+                  <path d="M128 103 H193" stroke="rgba(255,255,255,0.2)" stroke-width="4" stroke-linecap="round" />
+                  <g class="robot-eye robot-eye-left">
+                    <ellipse cx="144" cy="122" rx="14" ry="12" fill="rgba(255,255,255,0.9)" />
+                    <circle class="robot-pupil" cx="147" cy="122" r="7" fill="url(#robotEyeIris)" filter="url(#robotGlowFilter)" />
+                    <circle cx="150" cy="119" r="2.4" fill="#ffffff" />
+                    <path class="robot-eyelid" d="M130 113 Q144 106 158 113" fill="none" stroke="rgba(138,255,234,0.68)" stroke-width="3" stroke-linecap="round" />
+                  </g>
+                  <g class="robot-eye robot-eye-right">
+                    <ellipse cx="176" cy="122" rx="14" ry="12" fill="rgba(255,255,255,0.9)" />
+                    <circle class="robot-pupil" cx="179" cy="122" r="7" fill="url(#robotEyeIris)" filter="url(#robotGlowFilter)" />
+                    <circle cx="182" cy="119" r="2.4" fill="#ffffff" />
+                    <path class="robot-eyelid" d="M162 113 Q176 106 190 113" fill="none" stroke="rgba(138,255,234,0.68)" stroke-width="3" stroke-linecap="round" />
+                  </g>
+                  <g class="robot-mouth">
+                    <path d="M136 143 Q160 161 184 143" fill="none" stroke="url(#robotGlow)" stroke-width="6" stroke-linecap="round" />
+                    <path d="M146 147 Q160 154 174 147" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round" />
+                  </g>
+                  <path d="M134 174 Q160 190 186 174" fill="none" stroke="rgba(255,255,255,0.24)" stroke-width="6" stroke-linecap="round" />
+                  <path d="M102 112 Q92 130 98 156" fill="none" stroke="rgba(138,255,234,0.45)" stroke-width="5" stroke-linecap="round" />
+                  <path d="M218 112 Q228 130 222 156" fill="none" stroke="rgba(138,255,234,0.45)" stroke-width="5" stroke-linecap="round" />
+                </g>
 
-                <rect x="130" y="206" width="16" height="32" rx="8" fill="url(#robotChrome)" />
-                <rect x="174" y="206" width="16" height="32" rx="8" fill="url(#robotChrome)" />
-                <path d="M92 236 Q160 208 228 236 L248 314 Q160 364 72 314 Z" fill="url(#robotBody)" />
-                <path d="M110 250 Q160 232 210 250 L198 340 Q160 352 122 340 Z" fill="url(#robotChromeDark)" />
-                <path d="M94 242 Q160 224 226 242" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="6" stroke-linecap="round" />
-                <rect x="124" y="262" width="72" height="20" rx="10" fill="rgba(255,255,255,0.14)" />
-                <path d="M116 298 H204" stroke="url(#robotGlow)" stroke-width="8" stroke-linecap="round" />
-                <path d="M130 322 H190" stroke="rgba(215,238,255,0.9)" stroke-width="7" stroke-linecap="round" />
-                <circle cx="160" cy="352" r="22" fill="url(#robotCore)" filter="url(#robotGlowFilter)" />
+                <g class="robot-neck">
+                  <path d="M136 186 H184 L192 234 Q160 250 128 234 Z" fill="url(#robotChrome)" />
+                  <path d="M144 194 H176 L180 228 Q160 238 140 228 Z" fill="url(#robotChromeDark)" opacity="0.78" />
+                  <path d="M130 232 Q160 248 190 232" fill="none" stroke="rgba(255,255,255,0.32)" stroke-width="7" stroke-linecap="round" />
+                </g>
 
-                <circle cx="92" cy="258" r="24" fill="url(#robotChrome)" />
-                <circle cx="228" cy="258" r="24" fill="url(#robotChrome)" />
-                <rect x="48" y="258" width="38" height="104" rx="19" fill="url(#robotChrome)" />
-                <rect x="234" y="258" width="38" height="104" rx="19" fill="url(#robotChrome)" />
-                <rect x="38" y="346" width="50" height="84" rx="25" fill="url(#robotChrome)" transform="rotate(16 63 388)" />
-                <rect x="232" y="346" width="50" height="84" rx="25" fill="url(#robotChrome)" transform="rotate(-16 257 388)" />
-                <rect x="48" y="276" width="14" height="56" rx="7" fill="rgba(255,255,255,0.38)" />
-                <rect x="258" y="276" width="14" height="56" rx="7" fill="rgba(255,255,255,0.22)" />
-                <circle cx="62" cy="434" r="22" fill="url(#robotChrome)" />
-                <circle cx="258" cy="434" r="22" fill="url(#robotChrome)" />
+                <g class="robot-upper-body">
+                  <path d="M88 236 Q160 212 232 236 L248 314 Q160 364 72 314 Z" fill="url(#robotBody)" />
+                  <path d="M110 250 Q160 232 210 250 L198 340 Q160 352 122 340 Z" fill="url(#robotChromeDark)" />
+                  <path d="M94 242 Q160 222 226 242" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="6" stroke-linecap="round" />
+                  <rect x="124" y="262" width="72" height="20" rx="10" fill="rgba(255,255,255,0.14)" />
+                  <path class="robot-chest-line" d="M116 298 H204" stroke="url(#robotGlow)" stroke-width="8" stroke-linecap="round" />
+                  <path d="M130 322 H190" stroke="rgba(215,238,255,0.9)" stroke-width="7" stroke-linecap="round" />
+                  <circle cx="160" cy="352" r="22" fill="url(#robotCore)" filter="url(#robotGlowFilter)" />
+                </g>
+
+                <g class="robot-arm robot-arm-left">
+                  <circle cx="92" cy="258" r="24" fill="url(#robotChrome)" />
+                  <rect x="48" y="258" width="38" height="104" rx="19" fill="url(#robotChrome)" />
+                  <rect x="38" y="346" width="50" height="84" rx="25" fill="url(#robotChrome)" transform="rotate(16 63 388)" />
+                  <rect x="48" y="276" width="14" height="56" rx="7" fill="rgba(255,255,255,0.38)" />
+                  <circle cx="62" cy="434" r="22" fill="url(#robotChrome)" />
+                </g>
+                <g class="robot-arm robot-arm-right">
+                  <circle cx="228" cy="258" r="24" fill="url(#robotChrome)" />
+                  <rect x="234" y="258" width="38" height="104" rx="19" fill="url(#robotChrome)" />
+                  <rect x="232" y="346" width="50" height="84" rx="25" fill="url(#robotChrome)" transform="rotate(-16 257 388)" />
+                  <rect x="258" y="276" width="14" height="56" rx="7" fill="rgba(255,255,255,0.22)" />
+                  <circle cx="258" cy="434" r="22" fill="url(#robotChrome)" />
+                </g>
 
                 <path d="M126 372 H194" stroke="rgba(255,255,255,0.2)" stroke-width="6" stroke-linecap="round" />
                 <path d="M130 376 L112 452 Q160 474 208 452 L190 376 Z" fill="url(#robotChromeDark)" />
@@ -226,8 +327,6 @@ function getTradeWordTone(word: string) {
                 <rect x="100" y="458" width="54" height="24" rx="12" fill="url(#robotChrome)" />
                 <rect x="166" y="458" width="54" height="24" rx="12" fill="url(#robotChrome)" />
 
-                <path d="M102 112 Q92 130 98 156" fill="none" stroke="rgba(138,255,234,0.45)" stroke-width="5" stroke-linecap="round" />
-                <path d="M218 112 Q228 130 222 156" fill="none" stroke="rgba(138,255,234,0.45)" stroke-width="5" stroke-linecap="round" />
                 <path d="M82 248 Q58 286 68 338" fill="none" stroke="rgba(77,159,255,0.16)" stroke-width="3" stroke-linecap="round" />
                 <path d="M238 248 Q262 286 252 338" fill="none" stroke="rgba(77,159,255,0.16)" stroke-width="3" stroke-linecap="round" />
               </g>
@@ -569,22 +668,38 @@ function getTradeWordTone(word: string) {
   font-weight: 700;
   margin-bottom: 16px;
   line-height: 1.2;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
 }
 
 .hero-title-primary {
   color: #64ffda;
   display: block;
   margin-bottom: 4px;
+  min-height: 1.2em;
 }
 
 .hero-title-secondary {
-  display: block;
+  display: inline-block;
+  min-height: 1.2em;
+  max-width: 100%;
+  overflow-wrap: break-word;
 }
 
 .profit-text {
   color: #ff6b6b;
   margin-left: 8px;
+}
+
+.typewriter-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.86em;
+  margin-left: 5px;
+  vertical-align: -0.08em;
+  background: linear-gradient(180deg, #64ffda, #ff6b6b);
+  border-radius: 999px;
+  box-shadow: 0 0 14px rgba(100, 255, 218, 0.48);
+  animation: caretBlink 0.82s steps(1) infinite;
 }
 
 .hero-subtitle {
@@ -846,6 +961,63 @@ function getTradeWordTone(word: string) {
   animation: robotFloat 4.8s ease-in-out infinite;
 }
 
+.robot-head {
+  transform-box: fill-box;
+  transform-origin: 50% 78%;
+  animation: robotHeadNod 5.6s ease-in-out infinite;
+}
+
+.robot-upper-body {
+  transform-box: fill-box;
+  transform-origin: 50% 60%;
+  animation: robotUpperBodySway 6.4s ease-in-out infinite;
+}
+
+.robot-arm {
+  transform-box: fill-box;
+  animation: robotArmSwing 5.8s ease-in-out infinite;
+}
+
+.robot-arm-left {
+  transform-origin: 85% 12%;
+}
+
+.robot-arm-right {
+  transform-origin: 15% 12%;
+  animation-delay: -2.9s;
+}
+
+.robot-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.robot-pupil {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: robotEyeLook 4.2s ease-in-out infinite;
+}
+
+.robot-eye-right .robot-pupil {
+  animation-delay: -0.18s;
+}
+
+.robot-eyelid {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: robotBlink 5.8s ease-in-out infinite;
+}
+
+.robot-mouth {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: robotMouthBreathe 3.8s ease-in-out infinite;
+}
+
+.robot-chest-line {
+  animation: panelBarPulse 2.8s ease-in-out infinite;
+}
+
 
 
 /* 功能介绍 */
@@ -864,7 +1036,7 @@ function getTradeWordTone(word: string) {
   font-weight: 700;
   margin-bottom: 12px;
   color: var(--el-text-color-primary);
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
 }
 
 .section-subtitle {
@@ -1074,7 +1246,7 @@ function getTradeWordTone(word: string) {
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 16px;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
 }
 
 .cta-description {
@@ -1276,6 +1448,82 @@ function getTradeWordTone(word: string) {
   }
 }
 
+@keyframes robotHeadNod {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  28% {
+    transform: translateY(3px) rotate(-2.2deg);
+  }
+  62% {
+    transform: translateY(-2px) rotate(2deg);
+  }
+}
+
+@keyframes robotUpperBodySway {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  38% {
+    transform: translateX(-3px) rotate(-1.4deg);
+  }
+  72% {
+    transform: translateX(3px) rotate(1.2deg);
+  }
+}
+
+@keyframes robotArmSwing {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  36% {
+    transform: rotate(3.5deg) translateY(3px);
+  }
+  70% {
+    transform: rotate(-4deg) translateY(-2px);
+  }
+}
+
+@keyframes robotEyeLook {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  24% {
+    transform: translateX(2px);
+  }
+  58% {
+    transform: translateX(-2px);
+  }
+}
+
+@keyframes robotBlink {
+  0%,
+  88%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  91%,
+  94% {
+    transform: translateY(8px) scaleY(0.18);
+  }
+}
+
+@keyframes robotMouthBreathe {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: translateY(1px) scaleY(1.16);
+    opacity: 1;
+  }
+}
+
 @keyframes orbitSpin {
   from {
     transform: translate(-50%, -50%) rotate(0deg);
@@ -1292,6 +1540,17 @@ function getTradeWordTone(word: string) {
   }
   50% {
     transform: translateY(-8px);
+  }
+}
+
+@keyframes caretBlink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
   }
 }
 

@@ -63,7 +63,7 @@ export type SignalRow = {
   raw: Record<string, string>
 }
 
-export function extractSignalsFromMarkdown(markdown: string): SignalRow[] {
+function extractSignalsFromMarkdownLegacy(markdown: string): SignalRow[] {
   const table = parseMarkdownTable(markdown)
   if (!table) return []
 
@@ -81,6 +81,70 @@ export function extractSignalsFromMarkdown(markdown: string): SignalRow[] {
   const indexCol = findColumnIndex(table.headers, ['序号'])
 
   if (symbolCol < 0 || directionCol < 0 || entryCol < 0) return []
+
+  return table.rows
+    .map((cols) => {
+      const raw: Record<string, string> = {}
+      table.headers.forEach((h, i) => {
+        raw[h] = cols[i] ?? ''
+      })
+
+      const idxRaw = indexCol >= 0 ? cols[indexCol] : ''
+      const idx = Number.parseInt(idxRaw, 10)
+
+      return {
+        index: Number.isFinite(idx) ? idx : 0,
+        symbol: cols[symbolCol] ?? '',
+        direction: cols[directionCol] ?? '',
+        entryRange: cols[entryCol] ?? '',
+        stopLoss: stopLossCol >= 0 ? cols[stopLossCol] ?? '' : '',
+        takeProfit: takeProfitCol >= 0 ? cols[takeProfitCol] ?? '' : '',
+        holdingTime: holdingTimeCol >= 0 ? cols[holdingTimeCol] ?? '' : '',
+        raw,
+      }
+    })
+    .filter((r) => r.symbol !== '')
+}
+
+export function extractSignalsFromMarkdown(markdown: string): SignalRow[] {
+  const table = parseMarkdownTable(markdown)
+  if (!table) return []
+
+  const indexCol = findColumnIndex(table.headers, ['\u5e8f\u53f7'])
+  const symbolCol = findColumnIndex(table.headers, [
+    '\u54c1\u79cd',
+    '\u54c1\u79cd\uff08\u4ee3\u7801\uff09',
+    '\u54c1\u79cd(\u4ee3\u7801)',
+    '\u671f\u6743\u5408\u7ea6',
+  ])
+  const directionCol = findColumnIndex(table.headers, [
+    '\u591a\u7a7a',
+    '\u7b56\u7565',
+    '\u671f\u6743\u7b56\u7565',
+  ])
+  const entryCol = findColumnIndex(table.headers, [
+    '\u5165\u573a\u533a\u95f4',
+    '\u5165\u573a\u6743\u5229\u91d1\u533a\u95f4',
+  ])
+  const stopLossCol = findColumnIndex(table.headers, [
+    '\u6b62\u635f',
+    '\u6b62\u635f\u4f4d',
+    '\u6b62\u635f\u6761\u4ef6',
+  ])
+  const takeProfitCol = findColumnIndex(table.headers, [
+    '\u6b62\u76c8',
+    '\u6b62\u76c8\u4f4d',
+    '\u6b62\u76c8\u6761\u4ef6',
+  ])
+  const holdingTimeCol = findColumnIndex(table.headers, [
+    '\u6301\u4ed3\u65f6\u95f4',
+    '\u6301\u6709\u65f6\u95f4',
+    '\u5efa\u8bae\u6301\u4ed3\u65f6\u95f4',
+  ])
+
+  if (symbolCol < 0 || directionCol < 0 || entryCol < 0) {
+    return extractSignalsFromMarkdownLegacy(markdown)
+  }
 
   return table.rows
     .map((cols) => {

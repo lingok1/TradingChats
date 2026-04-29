@@ -52,9 +52,6 @@ func main() {
 	if err := authService.EnsureBootstrapData(context.Background()); err != nil {
 		log.Fatalf("Failed to bootstrap auth data: %v", err)
 	}
-	if err := modelAPIService.EnsureTabSettings(context.Background()); err != nil {
-		log.Fatalf("Failed to backfill model api tab settings: %v", err)
-	}
 	if err := tradePlanService.EnsureIndexes(context.Background()); err != nil {
 		log.Fatalf("Failed to ensure trade plan indexes: %v", err)
 	}

@@ -104,22 +104,6 @@ func (r *ModelAPIRepository) GetEnabledByTabTag(ctx context.Context, tabTag stri
 	return configs, nil
 }
 
-func (r *ModelAPIRepository) BackfillTabSettings(ctx context.Context, config *models.ModelAPIConfig) error {
-	if config == nil {
-		return nil
-	}
-
-	filter := bson.M{"_id": config.ID}
-	update := bson.M{
-		"$set": bson.M{
-			"tab_settings": config.TabSettings,
-			"updated_at":   utils.NowString(),
-		},
-	}
-	_, err := r.collection.UpdateOne(ctx, filter, update)
-	return err
-}
-
 func (r *ModelAPIRepository) Update(ctx context.Context, config *models.ModelAPIConfig) error {
 	config.UpdatedAt = utils.NowString()
 	filter := bson.M{"_id": config.ID}

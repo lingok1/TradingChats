@@ -52,6 +52,7 @@ func allTabSettings() []models.ModelAPITabSetting {
 	return []models.ModelAPITabSetting{
 		{TabTag: models.TabTagFutures, Enabled: true},
 		{TabTag: models.TabTagOptions, Enabled: true},
+		{TabTag: models.TabTagStock, Enabled: true},
 		{TabTag: models.TabTagNews, Enabled: true},
 		{TabTag: models.TabTagPosition, Enabled: true},
 	}
@@ -88,47 +89,6 @@ func isTabEnabled(config *models.ModelAPIConfig, tabTag string) bool {
 	}
 
 	return false
-}
-
-func (s *ModelAPIService) EnsureTabSettings(ctx context.Context) error {
-	configs, err := s.repo.GetAll(ctx)
-	if err != nil {
-		return err
-	}
-
-	for index := range configs {
-		needsBackfill := len(configs[index].TabSettings) == 0
-		normalizeModelAPIConfig(&configs[index])
-		if needsBackfill {
-			if err := s.repo.BackfillTabSettings(ctx, &configs[index]); err != nil {
-				return err
-			}
-			continue
-		}
-
-		existing := make(map[string]bool, len(configs[index].TabSettings))
-		for _, setting := range configs[index].TabSettings {
-			existing[setting.TabTag] = true
-		}
-
-		missing := false
-		for _, tag := range []string{models.TabTagFutures, models.TabTagOptions, models.TabTagNews, models.TabTagPosition} {
-			if !existing[tag] {
-				configs[index].TabSettings = append(configs[index].TabSettings, models.ModelAPITabSetting{
-					TabTag:  tag,
-					Enabled: false,
-				})
-				missing = true
-			}
-		}
-		if missing {
-			if err := s.repo.BackfillTabSettings(ctx, &configs[index]); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 func (s *ModelAPIService) CreateModelAPIConfig(ctx context.Context, config *models.ModelAPIConfig) error {

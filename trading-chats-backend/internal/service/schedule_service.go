@@ -41,7 +41,10 @@ func NewScheduleService(repo *repository.ScheduleRepository, aiResponseService *
 			cron.Dow |
 			cron.Descriptor,
 	)
-	c := cron.New(cron.WithParser(parser))
+	c := cron.New(
+		cron.WithParser(parser),
+		cron.WithLocation(utils.BeijingLocation),
+	)
 	return &ScheduleService{
 		repo:                  repo,
 		aiResponseService:     aiResponseService,
@@ -108,9 +111,12 @@ func (s *ScheduleService) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("Schedule Service loading %d active task(s).\n", len(configs))
 	for _, config := range configs {
 		if err := s.addTaskToCron(config); err != nil {
 			log.Printf("Failed to add task %s to cron: %v\n", config.ID.Hex(), err)
+		} else {
+			log.Printf("Registered scheduled task: %s (%s, %s)\n", config.ID.Hex(), config.Name, config.CronExpr)
 		}
 	}
 	log.Println("Schedule Service started successfully.")

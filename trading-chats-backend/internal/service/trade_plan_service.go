@@ -18,14 +18,15 @@ func NewTradePlanService(repo *repository.TradePlanRepository) *TradePlanService
 }
 
 func normalizeTradePlanTab(tabTag string) (string, error) {
+	tabTag = strings.TrimSpace(tabTag)
 	if tabTag == "" {
 		return models.TabTagFutures, nil
 	}
 	switch tabTag {
-	case models.TabTagFutures, models.TabTagOptions:
+	case models.TabTagFutures, models.TabTagOptions, models.TabTagStock:
 		return tabTag, nil
 	default:
-		return "", errors.New("tab_tag must be futures or options")
+		return "", errors.New("tab_tag must be futures, options or stock")
 	}
 }
 

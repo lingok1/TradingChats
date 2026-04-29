@@ -247,7 +247,7 @@ func (s *AIResponseService) callAIModel(ctx context.Context, tabTag string, resp
 		return
 	}
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 4 * 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		s.markResponseFailed(ctx, tabTag, response, fmt.Errorf("failed to send request: %v", err))
@@ -288,7 +288,7 @@ func (s *AIResponseService) callAIModel(ctx context.Context, tabTag string, resp
 		return
 	}
 
-	if index := strings.Index(content, "| 搴忓彿 |"); index > 0 {
+	if index := strings.Index(content, "| 序号 |"); index > 0 {
 		content = content[index:]
 	}
 
