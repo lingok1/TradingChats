@@ -125,6 +125,7 @@ let eventSource: EventSource | null = null
 let reconnectTimer: number | null = null
 let refreshTimer: number | null = null
 let eventStartTimer: number | null = null
+let authChangeHandler: (() => void) | null = null
 
 function isAnalysisTab(tab: string): tab is TabTag {
   return ANALYSIS_TABS.includes(tab as TabTag)
@@ -194,6 +195,21 @@ function loadAuth() {
     }
   } catch {
     localStorage.removeItem(authStorageKey)
+  }
+}
+
+function syncAuthFromStorage() {
+  const raw = localStorage.getItem(authStorageKey)
+  if (!raw) {
+    accessToken.value = ''
+    refreshToken.value = ''
+    currentUsername.value = ''
+    localStorage.removeItem('tc_access_token')
+    return
+  }
+  loadAuth()
+  if (accessToken.value) {
+    localStorage.setItem('tc_access_token', accessToken.value)
   }
 }
 
@@ -413,6 +429,9 @@ onMounted(() => {
     localStorage.setItem('tc_access_token', accessToken.value)
   }
 
+  authChangeHandler = () => syncAuthFromStorage()
+  window.addEventListener('tc_auth_changed', authChangeHandler)
+
   window.addEventListener('scroll', handleScroll, { passive: true })
 
   void loadSystemConfig()
@@ -439,6 +458,10 @@ onUnmounted(() => {
     refreshTimer = null
   }
   stopEventStream()
+  if (authChangeHandler) {
+    window.removeEventListener('tc_auth_changed', authChangeHandler)
+    authChangeHandler = null
+  }
   window.removeEventListener('scroll', handleScroll)
 })
 </script>

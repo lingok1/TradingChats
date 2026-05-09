@@ -37,29 +37,30 @@
 - ✅移动端，设置重新设计，提醒用户左右滑动快速切换（弃用）
 - ✅前端icon修改
 - ✅移动端顶部（凌期ai旁边）添加当前界面
+- 计划和期权更换icon
 - 股票模块提示词，中金所4个，国债4个
 - 微信扫码登录
 - token长时间未自动刷新
-- 
+- <br />
 
 ## 后端
 
-- ✅ai_responses表里面的prompt字段放到schedule_logs表里面，schedule_logs表添加字段区分是手动触发还是自动触发的任务
-- ✅schedule_configs表删除param1和param2，executeTask从system_configs表里面获取param1和param2的数据
+- ✅ai\_responses表里面的prompt字段放到schedule\_logs表里面，schedule\_logs表添加字段区分是手动触发还是自动触发的任务
+- ✅schedule\_configs表删除param1和param2，executeTask从system\_configs表里面获取param1和param2的数据
 - ✅开启定时任务后不会定时运行
 - ✅添加登录鉴权和多租户功能，修改和删除的接口需要进行鉴权操作，更新swagger接口文档，添加一个管理员和两个租户，给默认的账号密码
 - ✅响应的结果截取
 - ✅新增修改提示词需要给默认租户
 - ✅定时任务修改接口
 - ✅服务器部署.md
-- ✅model_api_configs表添加tab页标签（期货、期权、新闻、持仓）和tab页标签模型是否启用
-- ✅ai_responses表添加model_api_name和model_api_id两个字段（对应model_api_configs表的id和name）
-- ✅根据ai_responses表新增期权、新闻、持仓3张新表
+- ✅model\_api\_configs表添加tab页标签（期货、期权、新闻、持仓）和tab页标签模型是否启用
+- ✅ai\_responses表添加model\_api\_name和model\_api\_id两个字段（对应model\_api\_configs表的id和name）
+- ✅根据ai\_responses表新增期权、新闻、持仓3张新表
 - ✅后端完成ai response后sse通知前端刷新界面
 - ✅交易计划表设计和功能实现
 - ✅定时任务跑多个无法运行（时区原因）
-- ✅model_api_configs表tab_tag + tab_enable 兼容字段删除
+- ✅model\_api\_configs表tab\_tag + tab\_enable 兼容字段删除
 - 租户相互之间数据隔离
-- ai_responses表按天分表
-- 
+- ai\_responses表按天分表
+- <br />
 

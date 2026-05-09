@@ -12,8 +12,9 @@ services:
       MONGODB_DATABASE: trading_chats
       REDIS_URI: redis://:redis123@150.158.18.92:6379/0
       JWT_SECRET: your_jwt_secret_key
-      JWT_EXPIRATION: 24h
-      API_TIMEOUT: 30s
+      JWT_EXPIRATION: 168h
+      JWT_REFRESH_TTL: 336h
+      API_TIMEOUT: 300s
     ports:
       - "8080:8080"
 

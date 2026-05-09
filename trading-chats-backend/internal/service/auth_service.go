@@ -28,7 +28,7 @@ func NewAuthService(repo *repository.AuthRepository, jwtConfig config.JWTConfig)
 	return &AuthService{
 		repo:       repo,
 		jwtConfig:  jwtConfig,
-		refreshTTL: 7 * 24 * time.Hour,
+		refreshTTL: jwtConfig.RefreshTTL,
 	}
 }
 

@@ -2,21 +2,14 @@
 
 ## 快速部署
 
-### 步骤 1：环境准备与权限设置
-1. 确保位于项目根目录：`/home/TradingChats/serverBak`
-2. 设置目录权限（如未设置）：
-   ```bash
-   chmod -R 777 /home/TradingChats/serverBak
-   ```
-
-### 步骤 2：检查当前运行状态
+### 步骤 1：检查当前运行状态
 查看当前运行的 Docker 容器，确认服务状态：
 ```bash
 docker ps
 ```
 **预期输出**：如果服务已部署，应看到名为 `trading-chats-frontend` 和 `trading-chats-backend` 的容器。
 
-### 步骤 3：清理旧环境（如需重新部署）
+### 步骤 2：清理旧环境（如需重新部署）
 如果发现旧的容器正在运行，需要先停止并清理：
 ```bash
 # 停止并删除容器（根据实际容器名称）
@@ -28,7 +21,7 @@ docker rmi serverbak-frontend serverbak-backend
 ```
 **注意**：容器名称可能为 `trading-chats-*`，而镜像名称为 `serverbak-*`，这是正常现象。
 
-### 步骤 4：执行部署
+### 步骤 3：执行部署
 运行自动化部署脚本：
 ```bash
 cd /home/TradingChats/serverBak

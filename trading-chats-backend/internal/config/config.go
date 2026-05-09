@@ -38,6 +38,7 @@ type RedisConfig struct {
 type JWTConfig struct {
 	Secret     string
 	Expiration time.Duration
+	RefreshTTL time.Duration
 }
 
 type APIConfig struct {
@@ -60,7 +61,8 @@ func Load() (*Config, error) {
 		},
 		JWT: JWTConfig{
 			Secret:     getEnv("JWT_SECRET", "change_me_in_production"),
-			Expiration: getDurationEnv("JWT_EXPIRATION", 24*time.Hour),
+			Expiration: getDurationEnv("JWT_EXPIRATION", 7*24*time.Hour),
+			RefreshTTL: getDurationEnv("JWT_REFRESH_TTL", 14*24*time.Hour),
 		},
 		API: APIConfig{
 			Timeout: getDurationEnv("API_TIMEOUT", 60*time.Second),

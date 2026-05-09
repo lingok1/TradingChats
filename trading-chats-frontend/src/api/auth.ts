@@ -25,7 +25,16 @@ export type LoginResponse = {
   }
 }
 
+export type RefreshTokenRequest = {
+  refresh_token: string
+}
+
 export async function login(body: LoginRequest): Promise<LoginResponse> {
   const res = await http.post<ApiResponse<LoginResponse>>('/auth/login', body)
+  return unwrap(res.data)
+}
+
+export async function refresh(body: RefreshTokenRequest): Promise<LoginResponse> {
+  const res = await http.post<ApiResponse<LoginResponse>>('/auth/refresh', body)
   return unwrap(res.data)
 }

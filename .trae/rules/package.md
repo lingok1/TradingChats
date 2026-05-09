@@ -10,7 +10,7 @@ description: 打包前端后端项目
 
 ```
 bash
-$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o output/server-trading-chats ./cmd/api
+$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o output/servers ./cmd/api
 ```
 
 打包好后将文件名为server-trading-chats文件放到指定目录里面：D:\02-AICode\TradingChats-doc\serverBak\backend\build
