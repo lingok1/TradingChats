@@ -66,8 +66,8 @@ const TAB_META: Record<AppTab, { title: string; description: string }> = {
   },
 }
 
-const NAV_TABS: AppTab[] = ['futures', 'options', 'stock', 'news', 'plan', 'position', 'about']
-const ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'stock', 'news', 'position']
+const NAV_TABS: AppTab[] = ['futures', 'options', 'stock', /* 'news', */ 'plan', /* 'position', */ 'about']
+const ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'stock', /* 'news', 'position' */]
 const futuresIcon = chartLineIcon
 const optionsIcon = chartAreasplineVariantIcon
 const stockIcon = financeIcon
@@ -126,6 +126,8 @@ let reconnectTimer: number | null = null
 let refreshTimer: number | null = null
 let eventStartTimer: number | null = null
 let authChangeHandler: (() => void) | null = null
+let visibilityHandler: (() => void) | null = null
+let beforeUnloadHandler: (() => void) | null = null
 
 function isAnalysisTab(tab: string): tab is TabTag {
   return ANALYSIS_TABS.includes(tab as TabTag)
@@ -434,6 +436,18 @@ onMounted(() => {
 
   window.addEventListener('scroll', handleScroll, { passive: true })
 
+  visibilityHandler = () => {
+    if (document.visibilityState === 'hidden') {
+      stopEventStream()
+    } else if (isAnalysisView.value) {
+      startEventStream(currentAnalysisTab.value)
+    }
+  }
+  document.addEventListener('visibilitychange', visibilityHandler)
+
+  beforeUnloadHandler = () => stopEventStream()
+  window.addEventListener('beforeunload', beforeUnloadHandler)
+
   void loadSystemConfig()
   void loadLatest(currentAnalysisTab.value)
   startEventStreamAfterPageLoad(currentAnalysisTab.value)
@@ -444,12 +458,13 @@ watch(activeTab, (tab) => {
     responses.value = []
     errorText.value = ''
     loading.value = false
-    stopEventStream()
     return
   }
 
   void loadLatest(tab)
-  startEventStreamAfterPageLoad(tab)
+  if (!eventSource) {
+    startEventStreamAfterPageLoad(tab)
+  }
 })
 
 onUnmounted(() => {
@@ -461,6 +476,14 @@ onUnmounted(() => {
   if (authChangeHandler) {
     window.removeEventListener('tc_auth_changed', authChangeHandler)
     authChangeHandler = null
+  }
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler)
+    visibilityHandler = null
+  }
+  if (beforeUnloadHandler) {
+    window.removeEventListener('beforeunload', beforeUnloadHandler)
+    beforeUnloadHandler = null
   }
   window.removeEventListener('scroll', handleScroll)
 })
@@ -500,14 +523,14 @@ onUnmounted(() => {
               </div>
             </template>
           </el-tab-pane>
-          <el-tab-pane name="news">
+          <!-- <el-tab-pane name="news">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><Icon :icon="newsIcon" class="nav-icon" /></div>
                 <span class="ogo-tabs-text">新闻</span>
               </div>
             </template>
-          </el-tab-pane>
+          </el-tab-pane> -->
           <el-tab-pane name="plan">
             <template #label>
               <div class="ogo-tabs-tab-btn">
@@ -516,14 +539,14 @@ onUnmounted(() => {
               </div>
             </template>
           </el-tab-pane>
-          <el-tab-pane name="position">
+          <!-- <el-tab-pane name="position">
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><Icon :icon="positionIcon" class="nav-icon" /></div>
                 <span class="ogo-tabs-text">持仓</span>
               </div>
             </template>
-          </el-tab-pane>
+          </el-tab-pane> -->
           <el-tab-pane name="about">
             <template #label>
               <div class="ogo-tabs-tab-btn">

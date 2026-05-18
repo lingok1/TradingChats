@@ -47,6 +47,7 @@ func (h *AIResponseHandler) StreamAIResponseEvents(c *gin.Context) {
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 	c.Status(http.StatusOK)
+	_, _ = fmt.Fprint(c.Writer, ": connected\n\n")
 	flusher.Flush()
 
 	keepAlive := time.NewTicker(20 * time.Second)

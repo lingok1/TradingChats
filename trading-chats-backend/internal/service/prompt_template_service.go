@@ -71,7 +71,7 @@ func isValidURL(str string) bool {
 	return u.Scheme == "http" || u.Scheme == "https"
 }
 
-func fetchJSONData(ctx context.Context, urlStr string) (map[string]interface{}, error) {
+func fetchJSONData(ctx context.Context, urlStr string) (interface{}, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -95,7 +95,7 @@ func fetchJSONData(ctx context.Context, urlStr string) (map[string]interface{}, 
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var data map[string]interface{}
+	var data interface{}
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON data: %w", err)
 	}
@@ -103,12 +103,63 @@ func fetchJSONData(ctx context.Context, urlStr string) (map[string]interface{}, 
 	return data, nil
 }
 
-func formatJSONData(data map[string]interface{}) string {
+func formatJSONData(data interface{}) string {
 	jsonBytes, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("{error: %s}", err.Error())
 	}
 	return string(jsonBytes)
+}
+
+// futuresMarketSentiment 统计期货涨跌平数量，返回市场情绪摘要
+func futuresMarketSentiment(data interface{}) string {
+	obj, ok := data.(map[string]interface{})
+	if !ok {
+		return formatJSONData(data)
+	}
+	listRaw, ok := obj["list"]
+	if !ok {
+		return formatJSONData(data)
+	}
+	list, ok := listRaw.([]interface{})
+	if !ok {
+		return formatJSONData(data)
+	}
+
+	var up, down, flat int
+	for _, item := range list {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		zdf, ok := m["zdf"].(float64)
+		if !ok {
+			continue
+		}
+		switch {
+		case zdf > 0:
+			up++
+		case zdf < 0:
+			down++
+		default:
+			flat++
+		}
+	}
+	total := up + down + flat
+	var sentiment string
+	switch {
+	case up > down*2:
+		sentiment = "强势多头"
+	case down > up*2:
+		sentiment = "强势空头"
+	case up > down:
+		sentiment = "偏多"
+	case down > up:
+		sentiment = "偏空"
+	default:
+		sentiment = "多空均衡"
+	}
+	return fmt.Sprintf("总计%d个合约：上涨%d个，下跌%d个，持平%d个，市场情绪：%s", total, up, down, flat, sentiment)
 }
 
 func (s *PromptTemplateService) GeneratePrompt(ctx context.Context, templateID string) (string, error) {
@@ -142,7 +193,13 @@ func (s *PromptTemplateService) GeneratePrompt(ctx context.Context, templateID s
 				if fetchErr != nil {
 					prompt = strings.ReplaceAll(prompt, placeholder, fmt.Sprintf("[参数%s数据获取失败: %s]", key, fetchErr.Error()))
 				} else {
-					prompt = strings.ReplaceAll(prompt, placeholder, formatJSONData(data))
+					var formatted string
+					if key == "futures" || key == "futuresNight" {
+						formatted = futuresMarketSentiment(data)
+					} else {
+						formatted = formatJSONData(data)
+					}
+					prompt = strings.ReplaceAll(prompt, placeholder, formatted)
 				}
 			} else {
 				prompt = strings.ReplaceAll(prompt, placeholder, val)
