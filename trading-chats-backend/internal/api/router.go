@@ -22,6 +22,8 @@ func SetupRoutes(
 	scheduleService *service.ScheduleService,
 	systemConfigService service.SystemConfigService,
 	authService *service.AuthService,
+	tenantConfigService *service.TenantConfigService,
+	futuresRecommendationService *service.FuturesRecommendationService,
 ) {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -42,6 +44,8 @@ func SetupRoutes(
 	scheduleHandler := NewScheduleHandler(scheduleService)
 	systemConfigHandler := NewSystemConfigHandler(systemConfigService)
 	authHandler := NewAuthHandler(authService)
+	tenantConfigHandler := NewTenantConfigHandler(tenantConfigService)
+	futuresRecommendationHandler := NewFuturesRecommendationHandler(futuresRecommendationService)
 
 	// 期权功能当前复用通用分析链路，不单独拆 /api/options 前缀：
 	// 1. 前端在期权页使用 tab_tag=options 调用 /api/ai-responses/latest 读取最新完成批次。
@@ -62,6 +66,7 @@ func SetupRoutes(
 			auth.POST("/refresh", authHandler.RefreshToken)
 			auth.POST("/logout", authHandler.Logout)
 			auth.POST("/reset-password", authHandler.ResetPassword)
+			auth.GET("/tenants", authHandler.ListTenants)
 		}
 
 		promptTemplates := api.Group("/prompt-templates")
@@ -70,6 +75,7 @@ func SetupRoutes(
 			// GeneratePrompt 会将系统参数中的占位符替换为静态值或 URL 返回的 JSON，并追加当前北京时间。
 			promptTemplates.GET("", promptTemplateHandler.GetAllPromptTemplates)
 			promptTemplates.GET("/tag", promptTemplateHandler.GetPromptTemplatesByTag)
+			promptTemplates.GET("/futures-sentiment", promptTemplateHandler.GetFuturesMarketSentiment)
 			promptTemplates.GET("/:id", promptTemplateHandler.GetPromptTemplateByID)
 		}
 
@@ -112,6 +118,12 @@ func SetupRoutes(
 		{
 			systemConfig.GET("", systemConfigHandler.GetConfig)
 		}
+
+		futuresRec := api.Group("/futures-recommendation")
+		{
+			futuresRec.GET("", futuresRecommendationHandler.GetList)
+			futuresRec.GET("/latest", futuresRecommendationHandler.GetLatest)
+		}
 	}
 
 	protected := r.Group("/api")
@@ -147,6 +159,13 @@ func SetupRoutes(
 
 		protected.PUT("/system-config/basic", RequireRoles(models.RoleAdmin), systemConfigHandler.SaveBasicConfig)
 		protected.PUT("/system-config/parameters", RequireRoles(models.RoleAdmin, models.RoleTenant), systemConfigHandler.SaveParameters)
+
+		protected.GET("/tenant-config", tenantConfigHandler.GetConfig)
+		protected.GET("/tenant-config/list", RequireRoles(models.RoleAdmin), tenantConfigHandler.ListConfigs)
+		protected.PUT("/tenant-config/menu", RequireRoles(models.RoleAdmin), tenantConfigHandler.SaveMenu)
+		protected.PUT("/tenant-config/parameters", RequireRoles(models.RoleAdmin, models.RoleTenant), tenantConfigHandler.SaveParameters)
+
+		protected.POST("/futures-recommendation/generate", RequireRoles(models.RoleAdmin, models.RoleTenant), futuresRecommendationHandler.Generate)
 	}
 }
 
@@ -160,9 +179,11 @@ func SetupRouter(
 	systemConfigService service.SystemConfigService,
 	authService *service.AuthService,
 	swaggerConfig *config.SwaggerConfig,
+	tenantConfigService *service.TenantConfigService,
+	futuresRecommendationService *service.FuturesRecommendationService,
 ) *gin.Engine {
 	r := gin.Default()
-	SetupRoutes(r, promptTemplateService, modelAPIService, aiResponseService, aiResponseEventService, tradePlanService, scheduleService, systemConfigService, authService)
+	SetupRoutes(r, promptTemplateService, modelAPIService, aiResponseService, aiResponseEventService, tradePlanService, scheduleService, systemConfigService, authService, tenantConfigService, futuresRecommendationService)
 
 	r.GET("/swagger/*any", SwaggerBasicAuth(swaggerConfig), ginSwagger.WrapHandler(
 		swaggerFiles.Handler,

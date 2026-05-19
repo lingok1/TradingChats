@@ -172,7 +172,7 @@ onMounted(() => {
         <div class="params-wrap">
           <div
             v-for="(param, index) in currentParams"
-            :key="`${(currentPage - 1) * pageSize + index}-${param.key}-${param.value}`"
+            :key="`${(currentPage - 1) * pageSize + index}`"
             class="param-row"
           >
             <el-input

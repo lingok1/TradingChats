@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'
-import type { PromptTemplate, ScheduleConfig, ScheduleLog, TabTag } from '../../api/types'
+import type { ModelAPIConfig, PromptTemplate, ScheduleConfig, ScheduleLog, TabTag } from '../../api/types'
 import {
   createSchedule,
   deleteSchedule,
@@ -12,6 +12,7 @@ import {
   updateScheduleStatus,
 } from '../../api/schedules'
 import { getPromptTemplates } from '../../api/promptTemplates'
+import { getModelApiConfigs } from '../../api/modelApiConfigs'
 import { asTimeString } from '../../utils/time'
 import { highlightKeyword, matchesKeyword } from '../../utils/search'
 
@@ -75,6 +76,7 @@ const loading = ref(false)
 const toggleLoadingMap = reactive<Record<string, boolean>>({})
 const list = ref<ScheduleConfig[]>([])
 const promptTemplates = ref<PromptTemplate[]>([])
+const modelApiConfigs = ref<ModelAPIConfig[]>([])
 const templatesLoading = ref(false)
 const inputKeyword = ref('')
 const appliedKeyword = ref('')
@@ -97,7 +99,16 @@ const form = reactive({
   template_id: '',
   tab_tag: 'futures' as TabTag,
   status: 'paused' as 'active' | 'paused',
+  task_type: 'ai_response' as string,
+  model_api_id: '' as string,
+  model_name: '' as string,
 })
+
+const isRecommendationTask = computed(() => form.task_type === 'futures_recommendation')
+
+const selectedModelConfig = computed(() =>
+  modelApiConfigs.value.find(c => c.id === form.model_api_id)
+)
 
 const filteredList = computed(() => {
   if (!appliedKeyword.value) {
@@ -173,6 +184,9 @@ function resetForm() {
   form.tab_tag = 'futures'
   form.template_id = promptTemplates.value[0]?.id ?? ''
   form.status = 'paused'
+  form.task_type = 'ai_response'
+  form.model_api_id = ''
+  form.model_name = ''
   currentEditId.value = ''
 }
 
@@ -196,7 +210,9 @@ function formatDateTime(value: string | number | Date | null | undefined): strin
 async function fetchPromptTemplates() {
   templatesLoading.value = true
   try {
-    promptTemplates.value = await getPromptTemplates()
+    const [templates, models] = await Promise.all([getPromptTemplates(), getModelApiConfigs()])
+    promptTemplates.value = templates
+    modelApiConfigs.value = models
     if (!form.template_id) {
       form.template_id = promptTemplates.value[0]?.id ?? ''
     }
@@ -234,6 +250,9 @@ function openEdit(row: ScheduleConfig) {
   form.template_id = row.template_id ?? ''
   form.tab_tag = row.tab_tag ?? 'futures'
   form.status = row.status ?? 'paused'
+  form.task_type = row.task_type || 'ai_response'
+  form.model_api_id = row.model_api_id ?? ''
+  form.model_name = row.model_name ?? ''
   createOpen.value = true
 }
 
@@ -241,14 +260,28 @@ async function submit() {
   const body = {
     name: form.name.trim(),
     cron_expr: form.cron_expr.trim(),
-    template_id: form.template_id.trim(),
     tab_tag: form.tab_tag,
-    status: form.status,
+    status: form.status as 'active' | 'paused',
+    task_type: form.task_type,
+    template_id: '',
+    model_api_id: '',
+    model_name: '',
   }
 
-  if (!body.name || !body.cron_expr || !body.template_id || !body.tab_tag) {
-    ElMessage.warning(TEXT.validation)
-    return
+  if (isRecommendationTask.value) {
+    if (!body.name || !body.cron_expr || !form.model_api_id || !form.model_name) {
+      ElMessage.warning('请完整填写名称、Cron、模型配置和模型名称')
+      return
+    }
+    body.model_api_id = form.model_api_id
+    body.model_name = form.model_name
+    body.template_id = ''
+  } else {
+    body.template_id = form.template_id.trim()
+    if (!body.name || !body.cron_expr || !body.template_id || !body.tab_tag) {
+      ElMessage.warning(TEXT.validation)
+      return
+    }
   }
 
   loading.value = true
@@ -465,41 +498,78 @@ onMounted(async () => {
       class="pagination"
     />
 
-    <el-dialog v-model="createOpen" :title="dialogTitle" :width="props.mobile ? '90%' : '720px'" @closed="resetForm">
-      <el-form label-position="top">
-        <el-form-item :label="TEXT.name">
-          <el-input v-model="form.name" />
-        </el-form-item>
-        <el-form-item :label="TEXT.cron">
-          <el-input v-model="form.cron_expr" :placeholder="TEXT.cronPlaceholder" />
-        </el-form-item>
-        <el-form-item :label="TEXT.template">
-          <el-select v-model="form.template_id" :loading="templatesLoading" style="width: 100%">
-            <el-option
-              v-for="template in promptTemplates"
-              :key="template.id"
-              :label="template.name"
-              :value="template.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="TEXT.tab">
-          <el-select v-model="form.tab_tag" style="width: 100%">
-            <el-option v-for="item in tabOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="TEXT.status">
-          <el-radio-group v-model="form.status" :size="props.mobile ? 'small' : 'default'">
-            <el-radio-button label="active">{{ TEXT.active }}</el-radio-button>
-            <el-radio-button label="paused">{{ TEXT.paused }}</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
+    <el-dialog v-model="createOpen" :title="dialogTitle" :width="props.mobile ? '90%' : '640px'" @closed="resetForm">
+      <el-form label-position="top" class="schedule-form">
+        <el-row :gutter="12">
+          <el-col :span="props.mobile ? 24 : 12">
+            <el-form-item label="任务类型">
+              <el-select v-model="form.task_type" style="width: 100%">
+                <el-option label="AI 分析" value="ai_response" />
+                <el-option label="期货优选推荐" value="futures_recommendation" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="props.mobile ? 24 : 12">
+            <el-form-item :label="TEXT.name">
+              <el-input v-model="form.name" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="12">
+          <el-col :span="props.mobile ? 24 : 12">
+            <el-form-item :label="TEXT.cron">
+              <el-input v-model="form.cron_expr" :placeholder="TEXT.cronPlaceholder" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="props.mobile ? 24 : 12">
+            <el-form-item :label="TEXT.status">
+              <el-radio-group v-model="form.status">
+                <el-radio-button label="active">{{ TEXT.active }}</el-radio-button>
+                <el-radio-button label="paused">{{ TEXT.paused }}</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <template v-if="!isRecommendationTask">
+          <el-row :gutter="12">
+            <el-col :span="props.mobile ? 24 : 16">
+              <el-form-item :label="TEXT.template">
+                <el-select v-model="form.template_id" :loading="templatesLoading" style="width: 100%">
+                  <el-option v-for="t in promptTemplates" :key="t.id" :label="t.name" :value="t.id" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="props.mobile ? 24 : 8">
+              <el-form-item :label="TEXT.tab">
+                <el-select v-model="form.tab_tag" style="width: 100%">
+                  <el-option v-for="item in tabOptions" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
+        <template v-else>
+          <el-row :gutter="12">
+            <el-col :span="props.mobile ? 24 : 12">
+              <el-form-item label="模型配置">
+                <el-select v-model="form.model_api_id" style="width: 100%" @change="form.model_name = ''">
+                  <el-option v-for="cfg in modelApiConfigs" :key="cfg.id" :label="cfg.name" :value="cfg.id" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="props.mobile ? 24 : 12">
+              <el-form-item label="模型名称">
+                <el-select v-model="form.model_name" style="width: 100%" :disabled="!form.model_api_id">
+                  <el-option v-for="m in (selectedModelConfig?.models ?? [])" :key="m" :label="m" :value="m" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
       </el-form>
       <template #footer>
-        <el-space>
-          <el-button @click="createOpen = false">{{ TEXT.cancel }}</el-button>
-          <el-button type="primary" :loading="loading" @click="submit">{{ TEXT.save }}</el-button>
-        </el-space>
+        <el-button @click="createOpen = false">{{ TEXT.cancel }}</el-button>
+        <el-button type="primary" :loading="loading" @click="submit">{{ TEXT.save }}</el-button>
       </template>
     </el-dialog>
 

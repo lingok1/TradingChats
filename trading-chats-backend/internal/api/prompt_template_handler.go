@@ -170,7 +170,29 @@ func (h *PromptTemplateHandler) DeletePromptTemplate(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "Prompt template deleted successfully"}))
 }
 
-// GeneratePrompt 生成 Prompt
+// GetFuturesMarketSentiment 获取期货市场情绪
+// @Summary 获取期货市场情绪
+// @Description 从指定URL获取期货数据并统计涨跌平，返回市场情绪摘要
+// @Tags 提示词模板
+// @Produce json
+// @Param url query string true "期货数据URL"
+// @Success 200 {object} models.Response
+// @Failure 400 {object} models.Response
+// @Failure 500 {object} models.Response
+// @Router /api/prompt-templates/futures-sentiment [get]
+func (h *PromptTemplateHandler) GetFuturesMarketSentiment(c *gin.Context) {
+	urlStr := c.Query("url")
+	if urlStr == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(400, "url is required"))
+		return
+	}
+	result, err := h.service.FetchFuturesMarketSentiment(c.Request.Context(), urlStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
+		return
+	}
+	c.String(http.StatusOK, result)
+}
 // @Summary 生成 Prompt
 // @Description 基于模板生成 Prompt 内容
 // @Tags 提示词模板

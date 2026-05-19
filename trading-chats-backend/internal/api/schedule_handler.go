@@ -161,11 +161,14 @@ func (h *ScheduleHandler) UpdateConfig(c *gin.Context) {
 
 	// 更新配置
 	updateData := map[string]interface{}{
-		"name":        config.Name,
-		"cron_expr":   config.CronExpr,
-		"template_id": config.TemplateID,
-		"tab_tag":     config.TabTag,
-		"status":      config.Status,
+		"name":          config.Name,
+		"cron_expr":     config.CronExpr,
+		"template_id":   config.TemplateID,
+		"tab_tag":       config.TabTag,
+		"status":        config.Status,
+		"task_type":     config.TaskType,
+		"model_api_id":  config.ModelAPIID,
+		"model_name":    config.ModelName,
 	}
 
 	if err := h.service.UpdateConfig(c.Request.Context(), id, updateData); err != nil {

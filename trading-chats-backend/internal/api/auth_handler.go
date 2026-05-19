@@ -145,3 +145,19 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, models.SuccessResponse("password reset success"))
 }
+
+// ListTenants 获取租户列表
+// @Summary 获取租户列表
+// @Tags 认证
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.Response
+// @Router /api/auth/tenants [get]
+func (h *AuthHandler) ListTenants(c *gin.Context) {
+	tenants, err := h.service.GetAllTenants(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, models.SuccessResponse(tenants))
+}

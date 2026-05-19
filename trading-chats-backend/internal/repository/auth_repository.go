@@ -89,7 +89,13 @@ func (r *AuthRepository) UpsertTenant(ctx context.Context, tenant *models.Tenant
 		tenant.CreatedAt = utils.NowString()
 	}
 	tenant.UpdatedAt = utils.NowString()
-	_, err := r.tenantsCollection.ReplaceOne(ctx, bson.M{"_id": tenant.ID}, tenant, options.Replace().SetUpsert(true))
+	update := bson.M{
+		"name": tenant.Name, "type": tenant.Type,
+		"status": tenant.Status, "updated_at": tenant.UpdatedAt,
+	}
+	_, err := r.tenantsCollection.UpdateOne(ctx, bson.M{"_id": tenant.ID},
+		bson.M{"$set": update, "$setOnInsert": bson.M{"code": tenant.Code, "created_at": tenant.CreatedAt}},
+		options.Update().SetUpsert(true))
 	return err
 }
 
@@ -109,6 +115,19 @@ func (r *AuthRepository) GetTenantByCode(ctx context.Context, code string) (*mod
 	return &tenant, nil
 }
 
+func (r *AuthRepository) GetAllTenants(ctx context.Context) ([]models.Tenant, error) {
+	cursor, err := r.tenantsCollection.Find(ctx, bson.M{"type": models.TenantTypeBiz})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var tenants []models.Tenant
+	if err := cursor.All(ctx, &tenants); err != nil {
+		return nil, err
+	}
+	return tenants, nil
+}
+
 func (r *AuthRepository) CreateUser(ctx context.Context, user *models.User) error {
 	if user.CreatedAt == nil {
 		user.CreatedAt = utils.NowString()
@@ -126,7 +145,13 @@ func (r *AuthRepository) UpsertUser(ctx context.Context, user *models.User) erro
 		user.CreatedAt = utils.NowString()
 	}
 	user.UpdatedAt = utils.NowString()
-	_, err := r.usersCollection.ReplaceOne(ctx, bson.M{"username": user.Username}, user, options.Replace().SetUpsert(true))
+	update := bson.M{
+		"tenant_id": user.TenantID, "username": user.Username, "password_hash": user.PasswordHash,
+		"display_name": user.DisplayName, "role": user.Role, "status": user.Status, "updated_at": user.UpdatedAt,
+	}
+	_, err := r.usersCollection.UpdateOne(ctx, bson.M{"username": user.Username},
+		bson.M{"$set": update, "$setOnInsert": bson.M{"created_at": user.CreatedAt}},
+		options.Update().SetUpsert(true))
 	return err
 }
 

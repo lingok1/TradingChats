@@ -12,7 +12,6 @@ import walletOutlineIcon from '@iconify-icons/mdi/wallet-outline'
 import {
   Moon,
   Sunny,
-  Refresh,
   ArrowUp,
   Calendar,
   User,
@@ -21,6 +20,8 @@ import { ElMessage } from 'element-plus'
 import type { AIResponse, AIResponseEvent, TabTag } from './api/types'
 import { getAIResponseEventsUrl, getLatestAIResponses } from './api/aiResponses'
 import { getSystemConfig } from './api/systemConfig'
+import { getTenantConfig } from './api/tenantConfig'
+import type { TenantMenuConfig } from './api/types'
 import { useIsMobile } from './composables/useIsMobile'
 import { useTheme } from './composables/useTheme'
 import { hasRenderableMarkdownTable } from './utils/markdownTable'
@@ -32,6 +33,7 @@ import SignalDetailDrawer from './components/SignalDetailDrawer.vue'
 import LoginDialog from './components/LoginDialog.vue'
 import FeaturePage from './components/FeaturePage.vue'
 import TradePlansPage from './components/TradePlansPage.vue'
+import FuturesRecommendation from './components/FuturesRecommendation.vue'
 
 type AppTab = TabTag | 'plan' | 'about'
 
@@ -66,8 +68,14 @@ const TAB_META: Record<AppTab, { title: string; description: string }> = {
   },
 }
 
-const NAV_TABS: AppTab[] = ['futures', 'options', 'stock', /* 'news', */ 'plan', /* 'position', */ 'about']
-const ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'stock', /* 'news', 'position' */]
+const ALL_NAV_TABS: AppTab[] = ['futures', 'options', 'stock', /* 'news', */ 'plan', /* 'position', */ 'about']
+const ALL_ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'stock', /* 'news', 'position' */]
+
+const visibleTabs = ref<AppTab[]>(ALL_NAV_TABS)
+const visibleSettings = ref<string[]>(['schedules', 'models', 'templates', 'parameters', 'system'])
+
+const navTabs = computed(() => ALL_NAV_TABS.filter(t => visibleTabs.value.includes(t)))
+const analysisTabs = computed(() => ALL_ANALYSIS_TABS.filter(t => (visibleTabs.value as string[]).includes(t)))
 const futuresIcon = chartLineIcon
 const optionsIcon = chartAreasplineVariantIcon
 const stockIcon = financeIcon
@@ -104,6 +112,7 @@ const loginOpen = ref(false)
 const accessToken = ref('')
 const refreshToken = ref('')
 const currentUsername = ref('')
+const currentRole = ref('')
 
 const showBackToTop = ref(false)
 const headerFloating = ref(false)
@@ -130,7 +139,7 @@ let visibilityHandler: (() => void) | null = null
 let beforeUnloadHandler: (() => void) | null = null
 
 function isAnalysisTab(tab: string): tab is TabTag {
-  return ANALYSIS_TABS.includes(tab as TabTag)
+  return analysisTabs.value.includes(tab as TabTag)
 }
 
 const isLoggedIn = computed(() => accessToken.value.length > 0)
@@ -147,6 +156,8 @@ const renderableResponses = computed(() =>
 const batchCreatedAt = computed(() => asTimeString(renderableResponses.value[0]?.created_at))
 const successCount = computed(() => renderableResponses.value.length)
 const totalCount = computed(() => renderableResponses.value.length)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+void batchCreatedAt; void successCount; void totalCount
 
 const modelGroups = computed(() =>
   renderableResponses.value.map((item) => ({
@@ -175,6 +186,7 @@ function persistAuth() {
       accessToken: accessToken.value,
       refreshToken: refreshToken.value,
       username: currentUsername.value,
+      role: currentRole.value,
     }),
   )
 }
@@ -188,10 +200,12 @@ function loadAuth() {
       accessToken?: string
       refreshToken?: string
       username?: string
+      role?: string
     }
     accessToken.value = parsed.accessToken ?? ''
     refreshToken.value = parsed.refreshToken ?? ''
     currentUsername.value = parsed.username ?? ''
+    currentRole.value = parsed.role ?? ''
     if (!currentUsername.value && accessToken.value) {
       currentUsername.value = '已登录用户'
     }
@@ -219,6 +233,9 @@ function clearAuth() {
   accessToken.value = ''
   refreshToken.value = ''
   currentUsername.value = ''
+  currentRole.value = ''
+  visibleTabs.value = ALL_NAV_TABS
+  visibleSettings.value = ['schedules', 'models', 'templates', 'parameters', 'system']
   localStorage.removeItem(authStorageKey)
   localStorage.removeItem('tc_access_token')
 }
@@ -254,15 +271,15 @@ function handleTouchEnd(event: TouchEvent) {
   const diffY = startY.value - endY.value
   if (Math.abs(diffX) <= Math.abs(diffY) || Math.abs(diffX) <= 50) return
 
-  const currentIndex = NAV_TABS.indexOf(activeTab.value)
+  const currentIndex = navTabs.value.indexOf(activeTab.value)
   if (currentIndex < 0) return
 
   if (diffX > 0) {
-    activeTab.value = NAV_TABS[(currentIndex + 1) % NAV_TABS.length]
+    activeTab.value = navTabs.value[(currentIndex + 1) % navTabs.value.length]
     return
   }
 
-  activeTab.value = NAV_TABS[(currentIndex - 1 + NAV_TABS.length) % NAV_TABS.length]
+  activeTab.value = navTabs.value[(currentIndex - 1 + navTabs.value.length) % navTabs.value.length]
 }
 
 async function loadLatest(tab: TabTag = currentAnalysisTab.value) {
@@ -396,6 +413,34 @@ async function loadSystemConfig() {
   }
 }
 
+function applyTenantMenu(menu: TenantMenuConfig) {
+  if (menu.visible_tabs?.length) {
+    visibleTabs.value = ALL_NAV_TABS.filter(t => menu.visible_tabs.includes(t))
+  } else {
+    visibleTabs.value = ALL_NAV_TABS
+  }
+  if (menu.visible_settings?.length) {
+    visibleSettings.value = menu.visible_settings
+  } else {
+    visibleSettings.value = ['schedules', 'models', 'templates', 'parameters', 'system']
+  }
+  // 当前 tab 不在可见列表时，切换到第一个可见 tab
+  if (!visibleTabs.value.includes(activeTab.value)) {
+    activeTab.value = (visibleTabs.value[0] ?? 'futures') as AppTab
+  }
+}
+
+async function loadTenantConfig() {
+  if (!isLoggedIn.value) return
+  if (currentRole.value === 'admin') return
+  try {
+    const cfg = await getTenantConfig()
+    applyTenantMenu(cfg.menu_config)
+  } catch {
+    // 加载失败不影响使用
+  }
+}
+
 function handleSettingsClick() {
   if (!isLoggedIn.value) {
     loginOpen.value = true
@@ -404,12 +449,14 @@ function handleSettingsClick() {
   settingsOpen.value = true
 }
 
-function handleLoginSuccess(payload: { accessToken: string; refreshToken: string; username: string }) {
+function handleLoginSuccess(payload: { accessToken: string; refreshToken: string; username: string; role: string }) {
   accessToken.value = payload.accessToken
   refreshToken.value = payload.refreshToken
   currentUsername.value = payload.username
+  currentRole.value = payload.role
   localStorage.setItem('tc_access_token', payload.accessToken)
   persistAuth()
+  void loadTenantConfig()
   if (isAnalysisView.value) {
     startEventStream(currentAnalysisTab.value)
   }
@@ -449,6 +496,7 @@ onMounted(() => {
   window.addEventListener('beforeunload', beforeUnloadHandler)
 
   void loadSystemConfig()
+  void loadTenantConfig()
   void loadLatest(currentAnalysisTab.value)
   startEventStreamAfterPageLoad(currentAnalysisTab.value)
 })
@@ -577,7 +625,7 @@ onUnmounted(() => {
       <div class="tc-mobile-menu-overlay" @click="mobileMenuOpen = false" />
       <div class="tc-mobile-menu-content">
         <div
-          v-for="tab in NAV_TABS"
+          v-for="tab in navTabs"
           :key="tab"
           class="tc-mobile-menu-item"
           :class="{ active: activeTab === tab }"
@@ -599,20 +647,21 @@ onUnmounted(() => {
 
     <el-main class="tc-main" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
       <template v-if="isAnalysisView">
-        <div class="tc-toolbar">
+        <FuturesRecommendation v-if="currentAnalysisTab === 'futures'" />
+
+        <!-- <div class="tc-toolbar">
           <div class="tc-toolbar-meta">
-            <div class="tc-time">{{ isMobile ? '数据更新：' : '最近数据时间：' }}{{ batchCreatedAt || '-' }}</div>
-          </div>
-          <div class="tc-toolbar-actions">
-            <el-tag :type="sseConnected ? 'success' : 'info'">
-              {{ isMobile ? (sseConnected ? '已连接' : '重连中') : (sseConnected ? '实时刷新已连接' : '实时刷新重连中') }}
+            <span class="tc-time">{{ isMobile ? '更新：' : '最近数据时间：' }}{{ batchCreatedAt || '-' }}</span>
+            <span class="tc-divider">·</span>
+            <el-tag size="small" :type="sseConnected ? 'success' : 'info'" effect="plain">
+              {{ sseConnected ? '实时已连接' : '重连中' }}
             </el-tag>
-            <el-tag type="success">{{ isMobile ? `完成${successCount}/${totalCount}` : `成功 ${successCount}/${totalCount}` }}</el-tag>
-            <el-button circle title="刷新数据" :loading="loading" @click="loadLatest()">
-              <el-icon><Refresh /></el-icon>
-            </el-button>
+            <el-tag size="small" type="success" effect="plain">{{ successCount }}/{{ totalCount }}</el-tag>
           </div>
-        </div>
+          <el-button circle size="small" title="刷新数据" :loading="loading" @click="loadLatest()">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+        </div> -->
 
         <el-alert
           v-if="errorText"
@@ -676,6 +725,8 @@ onUnmounted(() => {
       v-model="settingsOpen"
       :mobile="isMobile"
       :username="currentUsername"
+      :visible-settings="visibleSettings"
+      :is-admin="currentRole === 'admin'"
       @logout="handleLogout"
     />
 
@@ -823,13 +874,16 @@ onUnmounted(() => {
 .tc-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .tc-toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
@@ -840,10 +894,15 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
+.tc-divider {
+  color: var(--el-border-color);
+  font-size: 12px;
+}
+
 .tc-time {
-  margin-top: 4px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  white-space: nowrap;
 }
 
 .tc-alert {

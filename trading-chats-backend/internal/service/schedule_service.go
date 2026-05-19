@@ -22,16 +22,17 @@ const (
 )
 
 type ScheduleService struct {
-	repo                  *repository.ScheduleRepository
-	aiResponseService     *AIResponseService
-	promptTemplateService *PromptTemplateService
-	cronEngine            *cron.Cron
-	cronParser            cron.Parser
-	taskMap               map[string]cron.EntryID
-	mutex                 sync.RWMutex
+	repo                          *repository.ScheduleRepository
+	aiResponseService             *AIResponseService
+	promptTemplateService         *PromptTemplateService
+	futuresRecommendationService  *FuturesRecommendationService
+	cronEngine                    *cron.Cron
+	cronParser                    cron.Parser
+	taskMap                       map[string]cron.EntryID
+	mutex                         sync.RWMutex
 }
 
-func NewScheduleService(repo *repository.ScheduleRepository, aiResponseService *AIResponseService, promptTemplateService *PromptTemplateService) *ScheduleService {
+func NewScheduleService(repo *repository.ScheduleRepository, aiResponseService *AIResponseService, promptTemplateService *PromptTemplateService, futuresRecommendationService *FuturesRecommendationService) *ScheduleService {
 	parser := cron.NewParser(
 		cron.SecondOptional |
 			cron.Minute |
@@ -46,12 +47,13 @@ func NewScheduleService(repo *repository.ScheduleRepository, aiResponseService *
 		cron.WithLocation(utils.BeijingLocation),
 	)
 	return &ScheduleService{
-		repo:                  repo,
-		aiResponseService:     aiResponseService,
-		promptTemplateService: promptTemplateService,
-		cronEngine:            c,
-		cronParser:            parser,
-		taskMap:               make(map[string]cron.EntryID),
+		repo:                         repo,
+		aiResponseService:            aiResponseService,
+		promptTemplateService:        promptTemplateService,
+		futuresRecommendationService: futuresRecommendationService,
+		cronEngine:                   c,
+		cronParser:                   parser,
+		taskMap:                      make(map[string]cron.EntryID),
 	}
 }
 
@@ -162,7 +164,30 @@ func (s *ScheduleService) executeTask(ctx context.Context, config models.Schedul
 	taskCtx, cancel := context.WithTimeout(ctx, 8*time.Minute)
 	defer cancel()
 	config.TabTag = models.NormalizeTabTag(config.TabTag)
-	log.Printf("Executing scheduled task: %s (TemplateID: %s, TriggerType: %s)\n", config.Name, config.TemplateID, triggerType)
+	log.Printf("Executing scheduled task: %s (TaskType: %s, TriggerType: %s)\n", config.Name, config.TaskType, triggerType)
+
+	// 推荐任务
+	if config.TaskType == "futures_recommendation" {
+		err := s.futuresRecommendationService.Generate(taskCtx, config.ModelAPIID, config.ModelName)
+		logEntry := &models.ScheduleLog{
+			TenantID:         config.TenantID,
+			ScheduleConfigID: config.ID,
+			TabTag:           models.TabTagFutures,
+			TriggerType:      triggerType,
+			ExecutedAt:       utils.NowString(),
+		}
+		if err != nil {
+			log.Printf("Recommendation task failed: %v\n", err)
+			logEntry.Status = "failed"
+			logEntry.Error = err.Error()
+		} else {
+			logEntry.Status = "success"
+		}
+		if err := s.repo.CreateLog(taskCtx, logEntry); err != nil {
+			log.Printf("Failed to save schedule log: %v\n", err)
+		}
+		return
+	}
 
 	prompt, err := s.promptTemplateService.GeneratePrompt(taskCtx, config.TemplateID)
 	if err != nil {

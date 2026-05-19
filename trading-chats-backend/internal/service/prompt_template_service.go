@@ -19,12 +19,14 @@ import (
 type PromptTemplateService struct {
 	repo                *repository.PromptTemplateRepository
 	systemConfigService SystemConfigService
+	tenantConfigService *TenantConfigService
 }
 
-func NewPromptTemplateService(repo *repository.PromptTemplateRepository, systemConfigService SystemConfigService) *PromptTemplateService {
+func NewPromptTemplateService(repo *repository.PromptTemplateRepository, systemConfigService SystemConfigService, tenantConfigService *TenantConfigService) *PromptTemplateService {
 	return &PromptTemplateService{
 		repo:                repo,
 		systemConfigService: systemConfigService,
+		tenantConfigService: tenantConfigService,
 	}
 }
 
@@ -111,7 +113,18 @@ func formatJSONData(data interface{}) string {
 	return string(jsonBytes)
 }
 
-// futuresMarketSentiment 统计期货涨跌平数量，返回市场情绪摘要
+// FetchFuturesMarketSentiment 从 URL 获取期货数据并返回市场情绪摘要
+func (s *PromptTemplateService) FetchFuturesMarketSentiment(ctx context.Context, urlStr string) (string, error) {
+	if !isValidURL(urlStr) {
+		return "", fmt.Errorf("invalid URL")
+	}
+	data, err := fetchJSONData(ctx, urlStr)
+	if err != nil {
+		return "", err
+	}
+	return futuresMarketSentiment(data), nil
+}
+
 func futuresMarketSentiment(data interface{}) string {
 	obj, ok := data.(map[string]interface{})
 	if !ok {
@@ -183,6 +196,13 @@ func (s *PromptTemplateService) GeneratePrompt(ctx context.Context, templateID s
 			runtimeParameters = map[string]string{}
 		}
 
+		// 优先使用租户参数，覆盖全局参数
+		if s.tenantConfigService != nil {
+			if tenantParams, err := s.tenantConfigService.GetParameters(ctx); err == nil && len(tenantParams) > 0 {
+				runtimeParameters = cloneParameters(tenantParams)
+			}
+		}
+
 		for key, val := range runtimeParameters {
 			placeholder := fmt.Sprintf("{{.%s}}", key)
 			if !strings.Contains(prompt, placeholder) {
@@ -193,13 +213,7 @@ func (s *PromptTemplateService) GeneratePrompt(ctx context.Context, templateID s
 				if fetchErr != nil {
 					prompt = strings.ReplaceAll(prompt, placeholder, fmt.Sprintf("[参数%s数据获取失败: %s]", key, fetchErr.Error()))
 				} else {
-					var formatted string
-					if key == "futures" || key == "futuresNight" {
-						formatted = futuresMarketSentiment(data)
-					} else {
-						formatted = formatJSONData(data)
-					}
-					prompt = strings.ReplaceAll(prompt, placeholder, formatted)
+					prompt = strings.ReplaceAll(prompt, placeholder, formatJSONData(data))
 				}
 			} else {
 				prompt = strings.ReplaceAll(prompt, placeholder, val)

@@ -4,11 +4,12 @@ import type { ApiResponse, TradePlan } from './types'
 
 type TradePlanPayload = Omit<TradePlan, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
 
-export async function getTradePlans(tabTag: TradePlan['tab_tag']): Promise<TradePlan[]> {
+export async function getTradePlans(tabTag: TradePlan['tab_tag'], signal?: AbortSignal): Promise<TradePlan[]> {
   const res = await http.get<ApiResponse<TradePlan[]>>('/trade-plans', {
     params: { tab_tag: tabTag },
+    signal,
   })
-  return unwrap(res.data)
+  return unwrap(res.data) ?? []
 }
 
 export async function getTradePlanById(id: string): Promise<TradePlan> {

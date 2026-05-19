@@ -481,37 +481,26 @@ onMounted(() => {
       />
     </div>
 
-    <el-dialog v-model="dialogOpen" :title="dialogTitle" :width="mobile ? '90%' : '720px'" @closed="resetForm">
-      <el-form label-position="top">
+    <el-dialog v-model="dialogOpen" :title="dialogTitle" :width="mobile ? '90%' : '600px'" @closed="resetForm">
+      <el-form label-position="top" class="model-form">
         <el-form-item v-if="editingId" :label="TEXT.id">
           <el-input v-model="editingId" disabled />
         </el-form-item>
-        <el-form-item :label="TEXT.name">
-          <el-input v-model="form.name" />
-        </el-form-item>
-        <el-form-item :label="TEXT.provider">
-          <el-select v-model="form.provider" :style="{ width: mobile ? '100%' : '220px' }">
-            <el-option label="openai" value="openai" />
-            <el-option label="anthropic" value="anthropic" />
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="TEXT.tabSettings">
-          <div class="model-tab-settings">
-            <div v-for="item in form.tab_settings" :key="item.tab_tag" class="model-tab-setting-row">
-              <el-checkbox v-model="item.selected">
-                {{ getTabLabel(item.tab_tag) }}
-              </el-checkbox>
-              <el-switch
-                v-model="item.enabled"
-                :disabled="!item.selected"
-                inline-prompt
-                :active-text="TEXT.enabled"
-                :inactive-text="TEXT.disabled"
-              />
-            </div>
-          </div>
-          <div class="model-tab-settings-tip">{{ TEXT.tabSettingsTip }}</div>
-        </el-form-item>
+        <el-row :gutter="12">
+          <el-col :span="mobile ? 24 : 14">
+            <el-form-item :label="TEXT.name">
+              <el-input v-model="form.name" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="mobile ? 24 : 10">
+            <el-form-item :label="TEXT.provider">
+              <el-select v-model="form.provider" style="width: 100%">
+                <el-option label="openai" value="openai" />
+                <el-option label="anthropic" value="anthropic" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item :label="TEXT.apiUrl">
           <el-input v-model="form.api_url" :placeholder="TEXT.placeholderApiUrl" />
         </el-form-item>
@@ -521,12 +510,25 @@ onMounted(() => {
         <el-form-item :label="TEXT.models">
           <el-input v-model="form.modelsText" :placeholder="TEXT.placeholderModels" />
         </el-form-item>
+        <el-form-item :label="TEXT.tabSettings">
+          <div class="model-tab-settings">
+            <div v-for="item in form.tab_settings" :key="item.tab_tag" class="model-tab-setting-row">
+              <span class="tab-label">{{ getTabLabel(item.tab_tag) }}</span>
+              <el-switch
+                :model-value="item.selected && item.enabled"
+                inline-prompt
+                :active-text="TEXT.enabled"
+                :inactive-text="TEXT.disabled"
+                @change="(val: boolean) => { item.selected = val; item.enabled = val }"
+              />
+            </div>
+          </div>
+          <div class="model-tab-settings-tip">{{ TEXT.tabSettingsTip }}</div>
+        </el-form-item>
       </el-form>
       <template #footer>
-        <el-space>
-          <el-button @click="dialogOpen = false">{{ TEXT.cancel }}</el-button>
-          <el-button type="primary" :loading="loading" @click="submit">{{ TEXT.save }}</el-button>
-        </el-space>
+        <el-button @click="dialogOpen = false">{{ TEXT.cancel }}</el-button>
+        <el-button type="primary" :loading="loading" @click="submit">{{ TEXT.save }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -535,20 +537,23 @@ onMounted(() => {
 <style scoped>
 .model-tab-settings {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
   width: 100%;
 }
 
 .model-tab-setting-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 6px 10px;
   border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
+  border-radius: 6px;
+}
+
+.tab-label {
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .model-tab-settings-tip {

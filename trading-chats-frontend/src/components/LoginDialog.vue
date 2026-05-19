@@ -9,7 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
-  (e: 'success', payload: { accessToken: string; refreshToken: string; username: string }): void
+  (e: 'success', payload: { accessToken: string; refreshToken: string; username: string; role: string }): void
 }>()
 
 const open = computed({
@@ -40,6 +40,7 @@ async function onSubmit() {
       accessToken: res.access_token,
       refreshToken: res.refresh_token,
       username: res.user.display_name || res.user.username,
+      role: res.user.role,
     })
 
     ElMessage.success('登录成功')

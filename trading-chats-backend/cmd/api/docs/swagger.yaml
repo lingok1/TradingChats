@@ -2,6 +2,9 @@ basePath: /
 definitions:
   models.GenerateAIRequest:
     properties:
+      tab_tag:
+        example: futures
+        type: string
       template_id:
         example: 69b4e08fbd4f24a37ff0a0cc
         type: string
@@ -15,6 +18,19 @@ definitions:
     required:
     - password
     - username
+    type: object
+  models.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_at:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
     type: object
   models.LogoutRequest:
     properties:
@@ -40,9 +56,20 @@ definitions:
         type: string
       provider:
         type: string
+      tab_settings:
+        items:
+          $ref: '#/definitions/models.ModelAPITabSetting'
+        type: array
       tenant_id:
         type: string
       updated_at: {}
+    type: object
+  models.ModelAPITabSetting:
+    properties:
+      enabled:
+        type: boolean
+      tab_tag:
+        type: string
     type: object
   models.PromptTemplate:
     properties:
@@ -105,6 +132,14 @@ definitions:
       msg:
         type: string
     type: object
+  models.Role:
+    enum:
+    - admin
+    - tenant
+    type: string
+    x-enum-varnames:
+    - RoleAdmin
+    - RoleTenant
   models.SaveSystemBasicConfigRequest:
     properties:
       system_logo:
@@ -119,13 +154,6 @@ definitions:
           type: string
         type: object
     type: object
-  models.SaveSystemRuntimeConfigRequest:
-    properties:
-      param1:
-        type: string
-      param2:
-        type: string
-    type: object
   models.ScheduleConfig:
     properties:
       created_at: {}
@@ -137,11 +165,44 @@ definitions:
         type: string
       status:
         type: string
+      tab_tag:
+        type: string
       template_id:
         type: string
       tenant_id:
         type: string
       updated_at: {}
+    type: object
+  models.UpdateStatusRequest:
+    properties:
+      id:
+        type: string
+      status:
+        enum:
+        - active
+        - paused
+        type: string
+    required:
+    - id
+    - status
+    type: object
+  models.User:
+    properties:
+      created_at: {}
+      display_name:
+        type: string
+      id:
+        type: string
+      last_login_at: {}
+      role:
+        $ref: '#/definitions/models.Role'
+      status:
+        type: string
+      tenant_id:
+        type: string
+      updated_at: {}
+      username:
+        type: string
     type: object
 host: localhost:8080
 info:
@@ -150,9 +211,9 @@ info:
   title: Trading Chats Backend API
   version: "1.0"
 paths:
-  /api/ai-responses:
+  /:
     get:
-      description: 获取当前可见的 AI 响应列表
+      description: 返回后端状态、名称、当前时间和系统信息
       produces:
       - application/json
       responses:
@@ -160,113 +221,15 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.Response'
-      summary: 获取 AI 响应列表
+      summary: 后端服务信息
       tags:
-      - AI响应
-  /api/ai-responses/{id}:
-    get:
-      description: 根据 ID 获取 AI 响应详情
-      parameters:
-      - description: AI 响应ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.Response'
-      summary: 获取 AI 响应详情
-      tags:
-      - AI响应
-  /api/ai-responses/batch:
-    get:
-      description: 根据 batch_id 获取 AI 响应列表
-      parameters:
-      - description: 批次ID
-        in: query
-        name: batch_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.Response'
-      summary: 按批次获取 AI 响应
-      tags:
-      - AI响应
-  /api/ai-responses/generate:
-    post:
-      consumes:
-      - application/json
-      description: 根据模板生成一批 AI 响应
-      parameters:
-      - description: 生成请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.GenerateAIRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.Response'
-      security:
-      - BearerAuth: []
-      summary: 生成 AI 响应
-      tags:
-      - AI响应
-  /api/ai-responses/latest:
-    get:
-      description: 获取最近成功生成的 AI 响应批次
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/models.Response'
-      summary: 获取最近成功批次
-      tags:
-      - AI响应
+      - 系统
   /api/auth/login:
     post:
       consumes:
       - application/json
-      description: 使用用户名与密码获取访问令牌
+      description: '使用用户名与密码获取访问令牌，返回的 access_token 用于后续请求的 Authorization Header (格式:
+        Bearer <token>)'
       parameters:
       - description: 登录请求
         in: body
@@ -280,7 +243,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Response'
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoginResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -352,7 +320,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 创建租户与租户管理员账号，并直接返回登录令牌
+      description: '创建租户与租户管理员账号，并直接返回登录令牌 (access_token 用于后续请求的 Authorization Header，格式:
+        Bearer <token>)'
       parameters:
       - description: 注册请求
         in: body
@@ -366,7 +335,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Response'
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.LoginResponse'
+              type: object
         "400":
           description: Bad Request
           schema:
@@ -726,6 +700,33 @@ paths:
       summary: 更新提示词模板
       tags:
       - 提示词模板
+  /api/prompt-templates/futures-sentiment:
+    get:
+      description: 从指定URL获取期货数据并统计涨跌平，返回市场情绪摘要
+      parameters:
+      - description: 期货数据URL
+        in: query
+        name: url
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 获取期货市场情绪
+      tags:
+      - 提示词模板
   /api/prompt-templates/generate:
     post:
       consumes:
@@ -854,6 +855,42 @@ paths:
       summary: 删除定时任务
       tags:
       - 定时任务
+    put:
+      consumes:
+      - application/json
+      description: 更新指定定时任务的配置
+      parameters:
+      - description: 定时任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 定时任务配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ScheduleConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 更新定时任务
+      tags:
+      - 定时任务
   /api/schedules/{id}/logs:
     get:
       description: 根据任务 ID 获取执行日志
@@ -875,37 +912,6 @@ paths:
           schema:
             $ref: '#/definitions/models.Response'
       summary: 获取定时任务日志
-      tags:
-      - 定时任务
-  /api/schedules/{id}/status:
-    put:
-      consumes:
-      - application/json
-      description: 将定时任务切换为 active 或 paused
-      parameters:
-      - description: 定时任务ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.Response'
-      security:
-      - BearerAuth: []
-      summary: 更新定时任务状态
       tags:
       - 定时任务
   /api/schedules/{id}/trigger:
@@ -931,6 +937,38 @@ paths:
       security:
       - BearerAuth: []
       summary: 手动触发定时任务
+      tags:
+      - 定时任务
+  /api/schedules/status:
+    put:
+      consumes:
+      - application/json
+      description: 将定时任务切换为 active 或 paused
+      parameters:
+      - description: 状态更新请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - BearerAuth: []
+      summary: 更新定时任务状态
       tags:
       - 定时任务
   /api/system-config:
@@ -1014,38 +1052,6 @@ paths:
       summary: 保存动态参数配置
       tags:
       - 系统配置
-  /api/system-config/runtime:
-    put:
-      consumes:
-      - application/json
-      description: 保存 param1 与 param2 运行时配置
-      parameters:
-      - description: 运行时参数配置
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/models.SaveSystemRuntimeConfigRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/models.Response'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/models.Response'
-      security:
-      - BearerAuth: []
-      summary: 保存运行时参数配置
-      tags:
-      - 系统配置
   /health:
     get:
       description: 返回服务健康状态
@@ -1059,4 +1065,10 @@ paths:
       summary: 健康检查
       tags:
       - 系统
+securityDefinitions:
+  BearerAuth:
+    description: '请输入 JWT Token，格式为: Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

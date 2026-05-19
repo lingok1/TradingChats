@@ -5,15 +5,18 @@ import (
 )
 
 type ScheduleConfig struct {
-	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	TenantID   string             `bson:"tenant_id" json:"tenant_id"`
-	Name       string             `bson:"name" json:"name"`
-	CronExpr   string             `bson:"cron_expr" json:"cron_expr"`
-	TemplateID string             `bson:"template_id" json:"template_id"`
-	TabTag     string             `bson:"tab_tag" json:"tab_tag"`
-	Status     string             `bson:"status" json:"status"`
-	CreatedAt  interface{}        `bson:"created_at" json:"created_at"`
-	UpdatedAt  interface{}        `bson:"updated_at" json:"updated_at"`
+	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	TenantID     string             `bson:"tenant_id" json:"tenant_id"`
+	Name         string             `bson:"name" json:"name"`
+	CronExpr     string             `bson:"cron_expr" json:"cron_expr"`
+	TemplateID   string             `bson:"template_id" json:"template_id"`
+	TabTag       string             `bson:"tab_tag" json:"tab_tag"`
+	TaskType     string             `bson:"task_type" json:"task_type"` // "" | "ai_response" | "futures_recommendation"
+	ModelAPIID   string             `bson:"model_api_id,omitempty" json:"model_api_id,omitempty"`
+	ModelName    string             `bson:"model_name,omitempty" json:"model_name,omitempty"`
+	Status       string             `bson:"status" json:"status"`
+	CreatedAt    interface{}        `bson:"created_at" json:"created_at"`
+	UpdatedAt    interface{}        `bson:"updated_at" json:"updated_at"`
 }
 
 type ScheduleLog struct {

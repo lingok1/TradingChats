@@ -9,172 +9,19 @@
     "host": "localhost:8080",
     "basePath": "/",
     "paths": {
-        "/api/ai-responses": {
+        "/": {
             "get": {
-                "description": "获取当前可见的 AI 响应列表",
+                "description": "返回后端状态、名称、当前时间和系统信息",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "AI响应"
+                    "系统"
                 ],
-                "summary": "获取 AI 响应列表",
+                "summary": "后端服务信息",
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/ai-responses/batch": {
-            "get": {
-                "description": "根据 batch_id 获取 AI 响应列表",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI响应"
-                ],
-                "summary": "按批次获取 AI 响应",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "批次ID",
-                        "name": "batch_id",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/ai-responses/generate": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "根据模板生成一批 AI 响应",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI响应"
-                ],
-                "summary": "生成 AI 响应",
-                "parameters": [
-                    {
-                        "description": "生成请求",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.GenerateAIRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/ai-responses/latest": {
-            "get": {
-                "description": "获取最近成功生成的 AI 响应批次",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI响应"
-                ],
-                "summary": "获取最近成功批次",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/ai-responses/{id}": {
-            "get": {
-                "description": "根据 ID 获取 AI 响应详情",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI响应"
-                ],
-                "summary": "获取 AI 响应详情",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "AI 响应ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/models.Response"
                         }
@@ -184,7 +31,7 @@
         },
         "/api/auth/login": {
             "post": {
-                "description": "使用用户名与密码获取访问令牌",
+                "description": "使用用户名与密码获取访问令牌，返回的 access_token 用于后续请求的 Authorization Header (格式: Bearer \u003ctoken\u003e)",
                 "consumes": [
                     "application/json"
                 ],
@@ -210,7 +57,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.LoginResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -316,7 +175,7 @@
         },
         "/api/auth/register": {
             "post": {
-                "description": "创建租户与租户管理员账号，并直接返回登录令牌",
+                "description": "创建租户与租户管理员账号，并直接返回登录令牌 (access_token 用于后续请求的 Authorization Header，格式: Bearer \u003ctoken\u003e)",
                 "consumes": [
                     "application/json"
                 ],
@@ -342,7 +201,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.LoginResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
@@ -772,6 +643,47 @@
                 }
             }
         },
+        "/api/prompt-templates/futures-sentiment": {
+            "get": {
+                "description": "从指定URL获取期货数据并统计涨跌平，返回市场情绪摘要",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "提示词模板"
+                ],
+                "summary": "获取期货市场情绪",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "期货数据URL",
+                        "name": "url",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/prompt-templates/generate": {
             "post": {
                 "security": [
@@ -1062,7 +974,114 @@
                 }
             }
         },
+        "/api/schedules/status": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "将定时任务切换为 active 或 paused",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "定时任务"
+                ],
+                "summary": "更新定时任务状态",
+                "parameters": [
+                    {
+                        "description": "状态更新请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UpdateStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/schedules/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新指定定时任务的配置",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "定时任务"
+                ],
+                "summary": "更新定时任务",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "定时任务ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "定时任务配置",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ScheduleConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "security": [
                     {
@@ -1124,55 +1143,6 @@
                 "responses": {
                     "200": {
                         "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/schedules/{id}/status": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "将定时任务切换为 active 或 paused",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "定时任务"
-                ],
-                "summary": "更新定时任务状态",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "定时任务ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/models.Response"
                         }
@@ -1354,57 +1324,6 @@
                 }
             }
         },
-        "/api/system-config/runtime": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "保存 param1 与 param2 运行时配置",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "系统配置"
-                ],
-                "summary": "保存运行时参数配置",
-                "parameters": [
-                    {
-                        "description": "运行时参数配置",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.SaveSystemRuntimeConfigRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/health": {
             "get": {
                 "description": "返回服务健康状态",
@@ -1430,6 +1349,10 @@
         "models.GenerateAIRequest": {
             "type": "object",
             "properties": {
+                "tab_tag": {
+                    "type": "string",
+                    "example": "futures"
+                },
                 "template_id": {
                     "type": "string",
                     "example": "69b4e08fbd4f24a37ff0a0cc"
@@ -1448,6 +1371,26 @@
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "models.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/models.User"
                 }
             }
         },
@@ -1487,10 +1430,27 @@
                 "provider": {
                     "type": "string"
                 },
+                "tab_settings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ModelAPITabSetting"
+                    }
+                },
                 "tenant_id": {
                     "type": "string"
                 },
                 "updated_at": {}
+            }
+        },
+        "models.ModelAPITabSetting": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "tab_tag": {
+                    "type": "string"
+                }
             }
         },
         "models.PromptTemplate": {
@@ -1583,6 +1543,17 @@
                 }
             }
         },
+        "models.Role": {
+            "type": "string",
+            "enum": [
+                "admin",
+                "tenant"
+            ],
+            "x-enum-varnames": [
+                "RoleAdmin",
+                "RoleTenant"
+            ]
+        },
         "models.SaveSystemBasicConfigRequest": {
             "type": "object",
             "properties": {
@@ -1605,17 +1576,6 @@
                 }
             }
         },
-        "models.SaveSystemRuntimeConfigRequest": {
-            "type": "object",
-            "properties": {
-                "param1": {
-                    "type": "string"
-                },
-                "param2": {
-                    "type": "string"
-                }
-            }
-        },
         "models.ScheduleConfig": {
             "type": "object",
             "properties": {
@@ -1632,6 +1592,9 @@
                 "status": {
                     "type": "string"
                 },
+                "tab_tag": {
+                    "type": "string"
+                },
                 "template_id": {
                     "type": "string"
                 },
@@ -1640,6 +1603,59 @@
                 },
                 "updated_at": {}
             }
+        },
+        "models.UpdateStatusRequest": {
+            "type": "object",
+            "required": [
+                "id",
+                "status"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "paused"
+                    ]
+                }
+            }
+        },
+        "models.User": {
+            "type": "object",
+            "properties": {
+                "created_at": {},
+                "display_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_login_at": {},
+                "role": {
+                    "$ref": "#/definitions/models.Role"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tenant_id": {
+                    "type": "string"
+                },
+                "updated_at": {},
+                "username": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "请输入 JWT Token，格式为: Bearer \u003ctoken\u003e",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }

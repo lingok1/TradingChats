@@ -80,6 +80,9 @@ export type ScheduleConfig = {
   cron_expr: string
   template_id: string
   tab_tag?: TabTag
+  task_type?: string
+  model_api_id?: string
+  model_name?: string
   status: 'active' | 'paused'
   created_at?: TimeLike
   updated_at?: TimeLike
@@ -112,6 +115,18 @@ export type TradePlan = {
   status: TradePlanStatus
   remark: string
   created_at?: TimeLike
+  updated_at?: TimeLike
+}
+
+export type TenantMenuConfig = {
+  visible_tabs: string[]
+  visible_settings: string[]
+}
+
+export type TenantConfig = {
+  id: string
+  parameters: Record<string, string>
+  menu_config: TenantMenuConfig
   updated_at?: TimeLike
 }
 

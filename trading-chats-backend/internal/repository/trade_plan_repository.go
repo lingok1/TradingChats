@@ -96,6 +96,9 @@ func (r *TradePlanRepository) GetAll(ctx context.Context, tabTag string) ([]mode
 	if err := cursor.All(ctx, &plans); err != nil {
 		return nil, err
 	}
+	if plans == nil {
+		plans = []models.TradePlan{}
+	}
 	return plans, nil
 }
 

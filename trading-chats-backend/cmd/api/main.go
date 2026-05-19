@@ -9,7 +9,7 @@ import (
 	"trading-chats-backend/internal/repository"
 	"trading-chats-backend/internal/service"
 
-	_ "trading-chats-backend/docs"
+	_ "trading-chats-backend/cmd/api/docs"
 )
 
 // @title Trading Chats Backend API
@@ -41,12 +41,16 @@ func main() {
 	authRepo := repository.NewAuthRepository(db.MongoDB)
 
 	systemConfigService := service.NewSystemConfigService(systemConfigRepo)
-	promptTemplateService := service.NewPromptTemplateService(promptTemplateRepo, systemConfigService)
+	tenantConfigRepo := repository.NewTenantConfigRepository(db.MongoDB)
+	tenantConfigService := service.NewTenantConfigService(tenantConfigRepo, systemConfigService)
+	promptTemplateService := service.NewPromptTemplateService(promptTemplateRepo, systemConfigService, tenantConfigService)
 	modelAPIService := service.NewModelAPIService(modelAPIRepo)
 	aiResponseEventService := service.NewAIResponseEventService()
 	aiResponseService := service.NewAIResponseService(aiResponseRepo, modelAPIService, promptTemplateService, systemConfigService, aiResponseEventService)
 	tradePlanService := service.NewTradePlanService(tradePlanRepo)
-	scheduleService := service.NewScheduleService(scheduleRepo, aiResponseService, promptTemplateService)
+	futuresRecommendationRepo := repository.NewFuturesRecommendationRepository(db.MongoDB)
+	futuresRecommendationService := service.NewFuturesRecommendationService(futuresRecommendationRepo, aiResponseRepo, modelAPIService)
+	scheduleService := service.NewScheduleService(scheduleRepo, aiResponseService, promptTemplateService, futuresRecommendationService)
 	authService := service.NewAuthService(authRepo, cfg.JWT)
 
 	if err := authService.EnsureBootstrapData(context.Background()); err != nil {
@@ -61,7 +65,7 @@ func main() {
 	}
 	defer scheduleService.Stop()
 
-	r := api.SetupRouter(promptTemplateService, modelAPIService, aiResponseService, aiResponseEventService, tradePlanService, scheduleService, systemConfigService, authService, &cfg.Swagger)
+	r := api.SetupRouter(promptTemplateService, modelAPIService, aiResponseService, aiResponseEventService, tradePlanService, scheduleService, systemConfigService, authService, &cfg.Swagger, tenantConfigService, futuresRecommendationService)
 
 	log.Printf("Server running at http://localhost:%s", cfg.Server.Port)
 	if err := r.Run(":" + cfg.Server.Port); err != nil {

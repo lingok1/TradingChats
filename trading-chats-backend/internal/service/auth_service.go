@@ -32,6 +32,10 @@ func NewAuthService(repo *repository.AuthRepository, jwtConfig config.JWTConfig)
 	}
 }
 
+func (s *AuthService) GetAllTenants(ctx context.Context) ([]models.Tenant, error) {
+	return s.repo.GetAllTenants(ctx)
+}
+
 func (s *AuthService) EnsureBootstrapData(ctx context.Context) error {
 	if err := s.repo.EnsureIndexes(ctx); err != nil {
 		return err
@@ -41,6 +45,7 @@ func (s *AuthService) EnsureBootstrapData(ctx context.Context) error {
 		{ID: "tenant-system", Name: "System Tenant", Code: "system", Type: models.TenantTypeSystem, Status: "active"},
 		{ID: "tenant-alpha", Name: "Tenant Alpha", Code: "tenant_alpha", Type: models.TenantTypeBiz, Status: "active"},
 		{ID: "tenant-beta", Name: "Tenant Beta", Code: "tenant_beta", Type: models.TenantTypeBiz, Status: "active"},
+		{ID: "tenant-gamma", Name: "Tenant Gamma", Code: "tenant_gamma", Type: models.TenantTypeBiz, Status: "active"},
 	}
 	for _, tenant := range seedTenants {
 		t := tenant
@@ -50,8 +55,9 @@ func (s *AuthService) EnsureBootstrapData(ctx context.Context) error {
 	}
 
 	adminPassword := getSeedPassword("SEED_ADMIN_PASSWORD", "Admin@123456")
-	alphaPassword := getSeedPassword("SEED_TENANT_ALPHA_PASSWORD", "TenantAlpha@123456")
-	betaPassword := getSeedPassword("SEED_TENANT_BETA_PASSWORD", "TenantBeta@123456")
+	alphaPassword := getSeedPassword("SEED_TENANT_ALPHA_PASSWORD", "Admin@123456")
+	betaPassword := getSeedPassword("SEED_TENANT_BETA_PASSWORD", "Admin@123456")
+	gammaPassword := getSeedPassword("SEED_TENANT_GAMMA_PASSWORD", "Admin@123456")
 
 	adminHash, err := HashPassword(adminPassword)
 	if err != nil {
@@ -65,11 +71,16 @@ func (s *AuthService) EnsureBootstrapData(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	gammaHash, err := HashPassword(gammaPassword)
+	if err != nil {
+		return err
+	}
 
 	seedUsers := []models.User{
 		{ID: "user-admin", TenantID: "tenant-system", Username: "admin", PasswordHash: adminHash, DisplayName: "System Admin", Role: models.RoleAdmin, Status: "active"},
 		{ID: "user-tenant-alpha", TenantID: "tenant-alpha", Username: "tenant_alpha", PasswordHash: alphaHash, DisplayName: "Tenant Alpha Admin", Role: models.RoleTenant, Status: "active"},
 		{ID: "user-tenant-beta", TenantID: "tenant-beta", Username: "tenant_beta", PasswordHash: betaHash, DisplayName: "Tenant Beta Admin", Role: models.RoleTenant, Status: "active"},
+		{ID: "user-tenant-gamma", TenantID: "tenant-gamma", Username: "tenant_gamma", PasswordHash: gammaHash, DisplayName: "Tenant Gamma Admin", Role: models.RoleTenant, Status: "active"},
 	}
 	for _, user := range seedUsers {
 		u := user
