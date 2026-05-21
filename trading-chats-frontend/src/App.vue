@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import chartAreasplineVariantIcon from '@iconify-icons/mdi/chart-areaspline-variant'
 import chartLineIcon from '@iconify-icons/mdi/chart-line'
+import homeOutlineIcon from '@iconify-icons/mdi/home-outline'
 import calendarMonthOutlineIcon from '@iconify-icons/mdi/calendar-month-outline'
 import newspaperVariantOutlineIcon from '@iconify-icons/mdi/newspaper-variant-outline'
 import financeIcon from '@iconify-icons/mdi/finance'
@@ -12,6 +13,7 @@ import walletOutlineIcon from '@iconify-icons/mdi/wallet-outline'
 import {
   Moon,
   Sunny,
+  Refresh,
   ArrowUp,
   Calendar,
   User,
@@ -33,11 +35,16 @@ import SignalDetailDrawer from './components/SignalDetailDrawer.vue'
 import LoginDialog from './components/LoginDialog.vue'
 import FeaturePage from './components/FeaturePage.vue'
 import TradePlansPage from './components/TradePlansPage.vue'
-import FuturesRecommendation from './components/FuturesRecommendation.vue'
+import HomePage from './components/HomePage.vue'
+import OptionsView from './components/OptionsView.vue'
 
-type AppTab = TabTag | 'plan' | 'about'
+type AppTab = TabTag | 'home' | 'plan' | 'about'
 
 const TAB_META: Record<AppTab, { title: string; description: string }> = {
+  home: {
+    title: '首页',
+    description: '集中展示期货、期权、股票优选推荐结果。',
+  },
   futures: {
     title: '期货',
     description: '展示期货页最近一批 AI 分析结果。',
@@ -68,7 +75,7 @@ const TAB_META: Record<AppTab, { title: string; description: string }> = {
   },
 }
 
-const ALL_NAV_TABS: AppTab[] = ['futures', 'options', 'stock', /* 'news', */ 'plan', /* 'position', */ 'about']
+const ALL_NAV_TABS: AppTab[] = ['home', 'futures', 'options', 'stock', /* 'news', */ 'plan', /* 'position', */ 'about']
 const ALL_ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'stock', /* 'news', 'position' */]
 
 const visibleTabs = ref<AppTab[]>(ALL_NAV_TABS)
@@ -83,8 +90,10 @@ const newsIcon = newspaperVariantOutlineIcon
 const planIcon = calendarMonthOutlineIcon
 const positionIcon = walletOutlineIcon
 const aboutIcon = informationOutlineIcon
+const homeIcon = homeOutlineIcon
 const mobileMenuIcon = menuIcon
 const TAB_ICONS: Record<AppTab, typeof futuresIcon> = {
+  home: homeIcon,
   futures: futuresIcon,
   options: optionsIcon,
   stock: stockIcon,
@@ -101,7 +110,7 @@ const eventRefreshDelay = 500
 const { isMobile } = useIsMobile()
 const { mode, isDark } = useTheme()
 
-const activeTab = ref<AppTab>('futures')
+const activeTab = ref<AppTab>('home')
 const mobileMenuOpen = ref(false)
 const startX = ref(0)
 const startY = ref(0)
@@ -156,8 +165,6 @@ const renderableResponses = computed(() =>
 const batchCreatedAt = computed(() => asTimeString(renderableResponses.value[0]?.created_at))
 const successCount = computed(() => renderableResponses.value.length)
 const totalCount = computed(() => renderableResponses.value.length)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-void batchCreatedAt; void successCount; void totalCount
 
 const modelGroups = computed(() =>
   renderableResponses.value.map((item) => ({
@@ -497,15 +504,21 @@ onMounted(() => {
 
   void loadSystemConfig()
   void loadTenantConfig()
-  void loadLatest(currentAnalysisTab.value)
-  startEventStreamAfterPageLoad(currentAnalysisTab.value)
+  if (isAnalysisView.value && activeTab.value !== 'options') {
+    void loadLatest(currentAnalysisTab.value)
+    startEventStreamAfterPageLoad(currentAnalysisTab.value)
+  }
 })
 
 watch(activeTab, (tab) => {
-  if (!isAnalysisTab(tab)) {
+  if (!isAnalysisTab(tab) || tab === 'options') {
     responses.value = []
     errorText.value = ''
     loading.value = false
+    if (tab === 'options') {
+      // 期权 tab 由 OptionsView 自己管理 SSE，关闭 App 级 SSE 避免重复
+      stopEventStream()
+    }
     return
   }
 
@@ -547,6 +560,14 @@ onUnmounted(() => {
 
       <div v-if="!isMobile" class="tc-header-tabs">
         <el-tabs v-model="activeTab" class="ogo-tabs" @tab-click="(tab: any) => handleTabChange(tab)">
+          <el-tab-pane name="home">
+            <template #label>
+              <div class="ogo-tabs-tab-btn">
+                <div class="ogo-tabs-icon"><Icon :icon="homeIcon" class="nav-icon" /></div>
+                <span class="ogo-tabs-text">首页</span>
+              </div>
+            </template>
+          </el-tab-pane>
           <el-tab-pane name="futures">
             <template #label>
               <div class="ogo-tabs-tab-btn">
@@ -632,7 +653,8 @@ onUnmounted(() => {
           @click="handleMobileTabChange(tab)"
         >
           <div class="tc-mobile-menu-icon">
-            <Icon v-if="tab === 'futures'" :icon="futuresIcon" class="nav-icon" />
+            <Icon v-if="tab === 'home'" :icon="homeIcon" class="nav-icon" />
+            <Icon v-else-if="tab === 'futures'" :icon="futuresIcon" class="nav-icon" />
             <Icon v-else-if="tab === 'options'" :icon="optionsIcon" class="nav-icon" />
             <Icon v-else-if="tab === 'stock'" :icon="stockIcon" class="nav-icon" />
             <Icon v-else-if="tab === 'news'" :icon="newsIcon" class="nav-icon" />
@@ -646,10 +668,20 @@ onUnmounted(() => {
     </div>
 
     <el-main class="tc-main" @touchstart="handleTouchStart" @touchend="handleTouchEnd">
-      <template v-if="isAnalysisView">
-        <FuturesRecommendation v-if="currentAnalysisTab === 'futures'" />
+      <template v-if="activeTab === 'home'">
+        <HomePage :mobile="isMobile" />
+      </template>
 
-        <!-- <div class="tc-toolbar">
+      <template v-else-if="activeTab === 'options'">
+        <OptionsView
+          :mobile="isMobile"
+          :logged-in="isLoggedIn"
+          @open-detail="onOpenDetail"
+        />
+      </template>
+
+      <template v-else-if="isAnalysisView">
+        <div class="tc-toolbar">
           <div class="tc-toolbar-meta">
             <span class="tc-time">{{ isMobile ? '更新：' : '最近数据时间：' }}{{ batchCreatedAt || '-' }}</span>
             <span class="tc-divider">·</span>
@@ -661,7 +693,7 @@ onUnmounted(() => {
           <el-button circle size="small" title="刷新数据" :loading="loading" @click="loadLatest()">
             <el-icon><Refresh /></el-icon>
           </el-button>
-        </div> -->
+        </div>
 
         <el-alert
           v-if="errorText"
@@ -710,8 +742,8 @@ onUnmounted(() => {
 
     <footer class="tc-footer">
       <div class="about">
-        <p class="copyright">© 2026 凌期AI个人自用</p>
         <p class="copyright copyright-links">
+          <span>© 2026 凌期AI个人自用</span>
           <a href="http://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer">ICP主体备案号：浙ICP备2026020164号</a>
           <a href="https://beian.mps.gov.cn/#/" target="_blank" rel="noopener noreferrer">全国互联网安全管理服务平台</a>
         </p>
@@ -945,8 +977,9 @@ onUnmounted(() => {
 
 .copyright-links {
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 

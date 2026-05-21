@@ -98,6 +98,26 @@ func (s *AIResponseService) GetLatestBatch(ctx context.Context, tabTag string) (
 	return responses, nil
 }
 
+// GetLatestBatchBySubTag 在指定 tab + sub_tag 下查询最新已完成批次的所有响应
+func (s *AIResponseService) GetLatestBatchBySubTag(ctx context.Context, tabTag, subTag string) ([]models.AIResponse, error) {
+	normalizedTabTag := normalizeAIResponseTab(tabTag)
+	batchID, err := s.repo.GetLatestCompletedBatchIDBySubTag(ctx, normalizedTabTag, subTag)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return []models.AIResponse{}, nil
+		}
+		return nil, fmt.Errorf("failed to find latest batch: %w", err)
+	}
+	responses, err := s.repo.GetCompletedByBatchIDAndSubTag(ctx, normalizedTabTag, batchID, subTag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load latest completed batch: %w", err)
+	}
+	if responses == nil {
+		return []models.AIResponse{}, nil
+	}
+	return responses, nil
+}
+
 func (s *AIResponseService) GetAllAIResponses(ctx context.Context, tabTag string) ([]models.AIResponse, error) {
 	return s.repo.GetAll(ctx, normalizeAIResponseTab(tabTag))
 }
@@ -115,6 +135,11 @@ func (s *AIResponseService) DeleteAIResponse(ctx context.Context, tabTag string,
 }
 
 func (s *AIResponseService) GenerateBatchAIResponses(ctx context.Context, templateID string, tabTag string) (string, error) {
+	return s.GenerateBatchAIResponsesWithSubTag(ctx, templateID, tabTag, "")
+}
+
+// GenerateBatchAIResponsesWithSubTag 与 GenerateBatchAIResponses 相同，但会把 subTag 写入每条 AIResponse
+func (s *AIResponseService) GenerateBatchAIResponsesWithSubTag(ctx context.Context, templateID string, tabTag string, subTag string) (string, error) {
 	normalizedTabTag := normalizeAIResponseTab(tabTag)
 	batchID := uuid.New().String()
 
@@ -138,6 +163,7 @@ func (s *AIResponseService) GenerateBatchAIResponses(ctx context.Context, templa
 			response := &models.AIResponse{
 				TenantID:     models.ResolveTenantID(authCtx, config.TenantID),
 				BatchID:      batchID,
+				SubTag:       subTag,
 				ModelAPIID:   config.ID,
 				ModelAPIName: config.Name,
 				ModelName:    modelName,
@@ -180,6 +206,7 @@ func (s *AIResponseService) publishResponseEvent(tabTag string, response *models
 	event := models.AIResponseEvent{
 		Type:         "ai_response_updated",
 		TabTag:       normalizeAIResponseTab(tabTag),
+		SubTag:       response.SubTag,
 		BatchID:      response.BatchID,
 		Status:       response.Status,
 		ModelName:    response.ModelName,

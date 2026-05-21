@@ -143,6 +143,52 @@ func (r *AIResponseRepository) GetLatestCompletedBatchID(ctx context.Context, ta
 	return response.BatchID, nil
 }
 
+// GetLatestCompletedBatchIDBySubTag 按 sub_tag 筛选最新已完成批次。subTag 为空时不加过滤条件。
+func (r *AIResponseRepository) GetLatestCompletedBatchIDBySubTag(ctx context.Context, tabTag, subTag string) (string, error) {
+	filter := bson.M{"status": "completed"}
+	if subTag != "" {
+		filter["sub_tag"] = subTag
+	}
+	applyTenantFilter(ctx, filter)
+	var response models.AIResponse
+	opts := options.FindOne().SetSort(bson.D{
+		{Key: "completed_at", Value: -1},
+		{Key: "updated_at", Value: -1},
+		{Key: "_id", Value: -1},
+	})
+	if err := r.collection(tabTag).FindOne(ctx, filter, opts).Decode(&response); err != nil {
+		return "", err
+	}
+	return response.BatchID, nil
+}
+
+// GetCompletedByBatchIDAndSubTag 按 batch_id + sub_tag 查询已完成响应
+func (r *AIResponseRepository) GetCompletedByBatchIDAndSubTag(ctx context.Context, tabTag, batchID, subTag string) ([]models.AIResponse, error) {
+	filter := bson.M{
+		"batch_id": batchID,
+		"status":   "completed",
+	}
+	if subTag != "" {
+		filter["sub_tag"] = subTag
+	}
+	applyTenantFilter(ctx, filter)
+	opts := options.Find().SetSort(bson.D{
+		{Key: "completed_at", Value: -1},
+		{Key: "updated_at", Value: -1},
+		{Key: "_id", Value: -1},
+	})
+	cursor, err := r.collection(tabTag).Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var responses []models.AIResponse
+	if err := cursor.All(ctx, &responses); err != nil {
+		return nil, err
+	}
+	return responses, nil
+}
+
 func (r *AIResponseRepository) Delete(ctx context.Context, tabTag string, id primitive.ObjectID) error {
 	filter := bson.M{"_id": id}
 	applyTenantFilter(ctx, filter)

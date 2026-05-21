@@ -39,6 +39,7 @@ export type GenerateAIResponse = {
 export type AIResponseEvent = {
   type: 'ai_response_updated'
   tab_tag: TabTag
+  sub_tag?: string
   batch_id: string
   status: string
   model_name: string
@@ -84,6 +85,7 @@ export type ScheduleConfig = {
   model_api_id?: string
   model_name?: string
   status: 'active' | 'paused'
+  sub_tag?: string
   created_at?: TimeLike
   updated_at?: TimeLike
 }

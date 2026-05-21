@@ -35,6 +35,16 @@ func (r *FuturesRecommendationRepository) GetLatest(ctx context.Context) (*model
 	return &rec, nil
 }
 
+func (r *FuturesRecommendationRepository) GetLatestByTab(ctx context.Context, tabTag string) (*models.FuturesRecommendation, error) {
+	opts := options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})
+	filter := bson.M{"tab_tag": tabTag}
+	var rec models.FuturesRecommendation
+	if err := r.collection.FindOne(ctx, filter, opts).Decode(&rec); err != nil {
+		return nil, err
+	}
+	return &rec, nil
+}
+
 func (r *FuturesRecommendationRepository) GetList(ctx context.Context, limit int64) ([]models.FuturesRecommendation, error) {
 	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}).SetLimit(limit)
 	cursor, err := r.collection.Find(ctx, bson.M{}, opts)

@@ -41,7 +41,7 @@ func SetupRoutes(
 	modelAPIHandler := NewModelAPIHandler(modelAPIService)
 	aiResponseHandler := NewAIResponseHandler(aiResponseService, aiResponseEventService)
 	tradePlanHandler := NewTradePlanHandler(tradePlanService)
-	scheduleHandler := NewScheduleHandler(scheduleService)
+	scheduleHandler := NewScheduleHandler(scheduleService, promptTemplateService)
 	systemConfigHandler := NewSystemConfigHandler(systemConfigService)
 	authHandler := NewAuthHandler(authService)
 	tenantConfigHandler := NewTenantConfigHandler(tenantConfigService)
@@ -76,6 +76,7 @@ func SetupRoutes(
 			promptTemplates.GET("", promptTemplateHandler.GetAllPromptTemplates)
 			promptTemplates.GET("/tag", promptTemplateHandler.GetPromptTemplatesByTag)
 			promptTemplates.GET("/futures-sentiment", promptTemplateHandler.GetFuturesMarketSentiment)
+			promptTemplates.GET("/futures-top-movers", promptTemplateHandler.GetFuturesTopMovers)
 			promptTemplates.GET("/:id", promptTemplateHandler.GetPromptTemplateByID)
 		}
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ type PromptTemplateService struct {
 	repo                *repository.PromptTemplateRepository
 	systemConfigService SystemConfigService
 	tenantConfigService *TenantConfigService
+	aiResponseRepo      *repository.AIResponseRepository
 }
 
 func NewPromptTemplateService(repo *repository.PromptTemplateRepository, systemConfigService SystemConfigService, tenantConfigService *TenantConfigService) *PromptTemplateService {
@@ -28,6 +30,11 @@ func NewPromptTemplateService(repo *repository.PromptTemplateRepository, systemC
 		systemConfigService: systemConfigService,
 		tenantConfigService: tenantConfigService,
 	}
+}
+
+// SetAIResponseRepo 注入 AIResponseRepo（用于推荐任务的 {{.xxxAIResult}} 占位符）
+func (s *PromptTemplateService) SetAIResponseRepo(repo *repository.AIResponseRepository) {
+	s.aiResponseRepo = repo
 }
 
 func (s *PromptTemplateService) CreatePromptTemplate(ctx context.Context, template *models.PromptTemplate) error {
@@ -123,6 +130,90 @@ func (s *PromptTemplateService) FetchFuturesMarketSentiment(ctx context.Context,
 		return "", err
 	}
 	return futuresMarketSentiment(data), nil
+}
+
+// FuturesMover 期货品种行情精简结构（仅暴露给前端用）
+type FuturesMover struct {
+	Name string  `json:"name"`
+	DM   string  `json:"dm"`
+	P    float64 `json:"p"`
+	Zdf  float64 `json:"zdf"`
+}
+
+// FuturesTopMovers 涨跌榜结果：gainers=涨幅前N，losers=跌幅前N
+type FuturesTopMovers struct {
+	Gainers []FuturesMover `json:"gainers"`
+	Losers  []FuturesMover `json:"losers"`
+}
+
+// FetchFuturesTopMovers 从 URL 获取期货数据，返回涨/跌幅各前 limit 个品种
+func (s *PromptTemplateService) FetchFuturesTopMovers(ctx context.Context, urlStr string, limit int) (*FuturesTopMovers, error) {
+	if !isValidURL(urlStr) {
+		return nil, fmt.Errorf("invalid URL")
+	}
+	if limit <= 0 {
+		limit = 9
+	}
+	data, err := fetchJSONData(ctx, urlStr)
+	if err != nil {
+		return nil, err
+	}
+	return extractFuturesTopMovers(data, limit), nil
+}
+
+func extractFuturesTopMovers(data interface{}, limit int) *FuturesTopMovers {
+	result := &FuturesTopMovers{
+		Gainers: []FuturesMover{},
+		Losers:  []FuturesMover{},
+	}
+	obj, ok := data.(map[string]interface{})
+	if !ok {
+		return result
+	}
+	listRaw, ok := obj["list"]
+	if !ok {
+		return result
+	}
+	list, ok := listRaw.([]interface{})
+	if !ok {
+		return result
+	}
+
+	var items []FuturesMover
+	for _, raw := range list {
+		m, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := m["name"].(string)
+		dm, _ := m["dm"].(string)
+		p, _ := m["p"].(float64)
+		zdf, _ := m["zdf"].(float64)
+		if name == "" && dm == "" {
+			continue
+		}
+		items = append(items, FuturesMover{Name: name, DM: dm, P: p, Zdf: zdf})
+	}
+
+	// 按 zdf 降序复制一份取涨幅前 limit
+	sortedDesc := make([]FuturesMover, len(items))
+	copy(sortedDesc, items)
+	sort.SliceStable(sortedDesc, func(i, j int) bool { return sortedDesc[i].Zdf > sortedDesc[j].Zdf })
+	if len(sortedDesc) > limit {
+		sortedDesc = sortedDesc[:limit]
+	}
+	result.Gainers = sortedDesc
+
+	// 按 zdf 升序取跌幅前 limit
+	sortedAsc := make([]FuturesMover, len(items))
+	copy(sortedAsc, items)
+	sort.SliceStable(sortedAsc, func(i, j int) bool { return sortedAsc[i].Zdf < sortedAsc[j].Zdf })
+	if len(sortedAsc) > limit {
+		sortedAsc = sortedAsc[:limit]
+	}
+	result.Losers = sortedAsc
+
+	return result
 }
 
 func futuresMarketSentiment(data interface{}) string {
@@ -221,8 +312,47 @@ func (s *PromptTemplateService) GeneratePrompt(ctx context.Context, templateID s
 		}
 	}
 
+	// 处理 {{.xxxAIResult}} 占位符，注入对应 tab 的最新分析数据
+	prompt = s.replaceAIResultPlaceholders(ctx, prompt)
+
 	prompt += fmt.Sprintf("\n- 当前北京时间: %s"+"，开仓时间: %s", beijingTime.Format("2006-01-02 15:04:05"),openTime.Format("2006-01-02 15:04:05"))
-	
+
 
 	return prompt, nil
+}
+
+// replaceAIResultPlaceholders 替换 {{.futuresAIResult}}、{{.optionsAIResult}}、{{.stockAIResult}} 占位符
+func (s *PromptTemplateService) replaceAIResultPlaceholders(ctx context.Context, prompt string) string {
+	if s.aiResponseRepo == nil {
+		return prompt
+	}
+
+	tabMap := map[string]string{
+		"{{.futuresAIResult}}": models.TabTagFutures,
+		"{{.optionsAIResult}}": models.TabTagOptions,
+		"{{.stockAIResult}}":   models.TabTagStock,
+	}
+
+	for placeholder, tabTag := range tabMap {
+		if !strings.Contains(prompt, placeholder) {
+			continue
+		}
+		batchID, err := s.aiResponseRepo.GetLatestCompletedBatchID(ctx, tabTag)
+		if err != nil {
+			prompt = strings.ReplaceAll(prompt, placeholder, fmt.Sprintf("[%s 暂无分析数据]", tabTag))
+			continue
+		}
+		responses, err := s.aiResponseRepo.GetCompletedByBatchID(ctx, tabTag, batchID)
+		if err != nil || len(responses) == 0 {
+			prompt = strings.ReplaceAll(prompt, placeholder, fmt.Sprintf("[%s 暂无分析数据]", tabTag))
+			continue
+		}
+		var sb strings.Builder
+		for i, r := range responses {
+			sb.WriteString(fmt.Sprintf("=== 模型%d（%s）分析结果 ===\n%s\n\n", i+1, r.ModelName, r.Response))
+		}
+		prompt = strings.ReplaceAll(prompt, placeholder, sb.String())
+	}
+
+	return prompt
 }

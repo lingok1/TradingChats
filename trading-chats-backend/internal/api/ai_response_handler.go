@@ -103,7 +103,15 @@ func (h *AIResponseHandler) GetAIResponsesByBatchID(c *gin.Context) {
 
 func (h *AIResponseHandler) GetLatestBatch(c *gin.Context) {
 	tabTag := getTabTagFromQuery(c)
-	responses, err := h.service.GetLatestBatch(c.Request.Context(), tabTag)
+	subTag := c.Query("sub_tag")
+
+	var responses []models.AIResponse
+	var err error
+	if subTag != "" {
+		responses, err = h.service.GetLatestBatchBySubTag(c.Request.Context(), tabTag, subTag)
+	} else {
+		responses, err = h.service.GetLatestBatch(c.Request.Context(), tabTag)
+	}
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse(404, err.Error()))
 		return

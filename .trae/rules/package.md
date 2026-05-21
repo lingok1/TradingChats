@@ -13,7 +13,12 @@ bash
 $env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o output/servers ./cmd/api
 ```
 
-打包好后将文件名为server-trading-chats文件放到指定目录里面：D:\02-AICode\TradingChats-doc\serverBak\backend\build
+打包好后将文件名一定为server文件放到指定目录里面：D:\02-AICode\TradingChats-doc\serverBak\backend\build，
+
+注意server文件一定要能在linux系统CPU 架构amd64中运行。
+
+将swagger的文档目录里面文件D:\02-AICode\TradingChats-doc\trading-chats-backend\cmd\api\docs，放到指定目录里面：D:\02-AICode\TradingChats-doc\serverBak\backend\build\docs。
+
 
 ## 前端项目打包
 

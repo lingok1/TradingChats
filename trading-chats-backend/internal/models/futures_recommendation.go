@@ -3,13 +3,14 @@ package models
 import "time"
 
 type FuturesRecommendation struct {
-	ID          string                   `bson:"_id,omitempty" json:"id"`
-	BatchID     string                   `bson:"batch_id" json:"batch_id"` // 引用的 ai_responses batch_id
-	Items       []RecommendationItem     `bson:"items" json:"items"`
-	RawResponse string                   `bson:"raw_response" json:"raw_response"`
-	ModelName   string                   `bson:"model_name" json:"model_name"`
-	ModelAPIName string                  `bson:"model_api_name" json:"model_api_name"`
-	CreatedAt   time.Time                `bson:"created_at" json:"created_at"`
+	ID           string               `bson:"_id,omitempty" json:"id"`
+	BatchID      string               `bson:"batch_id" json:"batch_id"` // 引用的 ai_responses batch_id
+	TabTag       string               `bson:"tab_tag" json:"tab_tag"`   // futures | options
+	Items        []RecommendationItem `bson:"items" json:"items"`
+	RawResponse  string               `bson:"raw_response" json:"raw_response"`
+	ModelName    string               `bson:"model_name" json:"model_name"`
+	ModelAPIName string               `bson:"model_api_name" json:"model_api_name"`
+	CreatedAt    time.Time            `bson:"created_at" json:"created_at"`
 }
 
 type RecommendationItem struct {

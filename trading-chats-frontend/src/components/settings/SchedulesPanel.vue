@@ -104,11 +104,25 @@ const form = reactive({
   model_name: '' as string,
 })
 
-const isRecommendationTask = computed(() => form.task_type === 'futures_recommendation')
+const isRecommendationTask = computed(() =>
+  form.task_type === 'futures_recommendation' || form.task_type === 'recommendation'
+)
 
 const selectedModelConfig = computed(() =>
   modelApiConfigs.value.find(c => c.id === form.model_api_id)
 )
+
+// 从所选模板的 tags 中解析 subtab:xxx
+const selectedSubTag = computed(() => {
+  const tpl = promptTemplates.value.find((t) => t.id === form.template_id)
+  if (!tpl?.tags?.length) return ''
+  for (const tag of tpl.tags) {
+    if (tag.startsWith('subtab:')) {
+      return tag.slice(7).trim()
+    }
+  }
+  return ''
+})
 
 const filteredList = computed(() => {
   if (!appliedKeyword.value) {
@@ -121,6 +135,7 @@ const filteredList = computed(() => {
         item.name,
         item.cron_expr,
         item.template_id,
+        getTemplateName(item.template_id),
         getTabLabel(item.tab_tag),
         item.status,
         asTimeString(item.updated_at || item.created_at),
@@ -190,8 +205,32 @@ function resetForm() {
   currentEditId.value = ''
 }
 
+// 推荐任务选择模板后，根据 tags 自动设置 tab_tag
+watch(() => form.template_id, (newTemplateId) => {
+  if (!isRecommendationTask.value || !newTemplateId) return
+  const template = promptTemplates.value.find(t => t.id === newTemplateId)
+  if (!template?.tags?.length) return
+  const tagTabMap: Record<string, TabTag> = {
+    futures: 'futures', options: 'options', stock: 'stock', news: 'news', position: 'position',
+    期货: 'futures', 期权: 'options', 股票: 'stock',
+  }
+  for (const tag of template.tags) {
+    const tab = tagTabMap[tag.toLowerCase()] || tagTabMap[tag]
+    if (tab) {
+      form.tab_tag = tab
+      break
+    }
+  }
+})
+
 function getTabLabel(tab?: string) {
   return tabOptions.find((item) => item.value === tab)?.label ?? (tab || 'futures')
+}
+
+function getTemplateName(templateId?: string) {
+  if (!templateId) return ''
+  const template = promptTemplates.value.find((t) => t.id === templateId)
+  return template?.name ?? templateId
 }
 
 function formatDateTime(value: string | number | Date | null | undefined): string {
@@ -263,21 +302,19 @@ async function submit() {
     tab_tag: form.tab_tag,
     status: form.status as 'active' | 'paused',
     task_type: form.task_type,
-    template_id: '',
+    template_id: form.template_id.trim(),
     model_api_id: '',
     model_name: '',
   }
 
   if (isRecommendationTask.value) {
-    if (!body.name || !body.cron_expr || !form.model_api_id || !form.model_name) {
-      ElMessage.warning('请完整填写名称、Cron、模型配置和模型名称')
+    if (!body.name || !body.cron_expr || !body.template_id || !form.model_api_id || !form.model_name) {
+      ElMessage.warning('请完整填写名称、Cron、模板、模型配置和模型名称')
       return
     }
     body.model_api_id = form.model_api_id
     body.model_name = form.model_name
-    body.template_id = ''
   } else {
-    body.template_id = form.template_id.trim()
     if (!body.name || !body.cron_expr || !body.template_id || !body.tab_tag) {
       ElMessage.warning(TEXT.validation)
       return
@@ -435,7 +472,19 @@ onMounted(async () => {
           show-overflow-tooltip
         >
           <template #default="scope">
-            <span v-html="highlightText(scope.row.template_id)" />
+            <span v-html="highlightText(getTemplateName(scope.row.template_id))" />
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-if="!props.mobile"
+          label="子页签"
+          :width="120"
+        >
+          <template #default="scope">
+            <el-tag v-if="scope.row.sub_tag" size="small" type="info" effect="plain">
+              {{ scope.row.sub_tag }}
+            </el-tag>
+            <span v-else style="color: var(--el-text-color-placeholder); font-size: 12px;">-</span>
           </template>
         </el-table-column>
         <el-table-column :label="TEXT.tab" :width="props.mobile ? 90 : 110">
@@ -505,7 +554,7 @@ onMounted(async () => {
             <el-form-item label="任务类型">
               <el-select v-model="form.task_type" style="width: 100%">
                 <el-option label="AI 分析" value="ai_response" />
-                <el-option label="期货优选推荐" value="futures_recommendation" />
+                <el-option label="优选推荐" value="recommendation" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -530,25 +579,31 @@ onMounted(async () => {
             </el-form-item>
           </el-col>
         </el-row>
-        <template v-if="!isRecommendationTask">
-          <el-row :gutter="12">
-            <el-col :span="props.mobile ? 24 : 16">
-              <el-form-item :label="TEXT.template">
-                <el-select v-model="form.template_id" :loading="templatesLoading" style="width: 100%">
-                  <el-option v-for="t in promptTemplates" :key="t.id" :label="t.name" :value="t.id" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="props.mobile ? 24 : 8">
-              <el-form-item :label="TEXT.tab">
-                <el-select v-model="form.tab_tag" style="width: 100%">
-                  <el-option v-for="item in tabOptions" :key="item.value" :label="item.label" :value="item.value" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-          </el-row>
-        </template>
-        <template v-else>
+        <el-row :gutter="12">
+          <el-col :span="props.mobile ? 24 : 16">
+            <el-form-item :label="TEXT.template">
+              <el-select v-model="form.template_id" :loading="templatesLoading" style="width: 100%">
+                <el-option v-for="t in promptTemplates" :key="t.id" :label="t.name" :value="t.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="props.mobile ? 24 : 8">
+            <el-form-item :label="TEXT.tab">
+              <el-select v-model="form.tab_tag" style="width: 100%" :disabled="isRecommendationTask">
+                <el-option v-for="item in tabOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row v-if="selectedSubTag" :gutter="12">
+          <el-col :span="24">
+            <el-form-item label="子页签 (sub_tag)">
+              <el-input :model-value="selectedSubTag" disabled placeholder="由模板 tag 自动派生" />
+              <div class="tip-text">该任务的分析结果会归类到期权 tab 下名为「{{ selectedSubTag }}」的子页签</div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <template v-if="isRecommendationTask">
           <el-row :gutter="12">
             <el-col :span="props.mobile ? 24 : 12">
               <el-form-item label="模型配置">
@@ -654,5 +709,12 @@ onMounted(async () => {
 .logs-total {
   font-size: 13px;
   color: var(--el-text-color-secondary);
+}
+
+.tip-text {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>

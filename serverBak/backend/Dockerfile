@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata wget
 
 COPY build/server /app/server
-COPY docs /app/docs
+COPY build/docs /app/docs
 
 EXPOSE 8080
 

@@ -18,14 +18,16 @@ func NewFuturesRecommendationHandler(svc *service.FuturesRecommendationService) 
 	return &FuturesRecommendationHandler{service: svc}
 }
 
-// GetLatest 获取最新期货推荐
-// @Summary 获取最新期货优选推荐
-// @Tags 期货推荐
+// GetLatest 获取最新推荐
+// @Summary 获取最新优选推荐
+// @Tags 推荐
 // @Produce json
+// @Param tab_tag query string false "tab类型（futures/options/stock），不传则返回所有类型中最新一条"
 // @Success 200 {object} models.Response
 // @Router /api/futures-recommendation/latest [get]
 func (h *FuturesRecommendationHandler) GetLatest(c *gin.Context) {
-	rec, err := h.service.GetLatest(c.Request.Context())
+	tabTag := c.Query("tab_tag")
+	rec, err := h.service.GetLatestByTab(c.Request.Context(), tabTag)
 	if err != nil {
 		c.JSON(http.StatusOK, models.SuccessResponse(nil))
 		return

@@ -46,7 +46,12 @@ func (s *AIResponseEventService) Subscribe(tabTag string) (<-chan models.AIRespo
 }
 
 func (s *AIResponseEventService) Publish(event models.AIResponseEvent) {
-	normalizedTab := models.NormalizeTabTag(event.TabTag)
+	s.PublishToChannel(event.TabTag, event)
+}
+
+// PublishToChannel 发布到指定频道，event 内容不变（用于跨频道转发，例如 home 频道）
+func (s *AIResponseEventService) PublishToChannel(channel string, event models.AIResponseEvent) {
+	normalizedTab := models.NormalizeTabTag(channel)
 
 	s.mutex.RLock()
 	subscribers := s.subscribers[normalizedTab]

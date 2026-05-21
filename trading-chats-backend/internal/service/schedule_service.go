@@ -166,13 +166,33 @@ func (s *ScheduleService) executeTask(ctx context.Context, config models.Schedul
 	config.TabTag = models.NormalizeTabTag(config.TabTag)
 	log.Printf("Executing scheduled task: %s (TaskType: %s, TriggerType: %s)\n", config.Name, config.TaskType, triggerType)
 
-	// 推荐任务
-	if config.TaskType == "futures_recommendation" {
-		err := s.futuresRecommendationService.Generate(taskCtx, config.ModelAPIID, config.ModelName)
+	// 推荐任务：使用模板生成推荐 prompt（template_id 必填，tab_tag 决定推荐分类）
+	if config.TaskType == "futures_recommendation" || config.TaskType == "recommendation" {
+		// 获取模板内容作为推荐 prompt（模板里通过 {{.futuresAIResult}} 等占位符注入分析数据）
+		prompt, err := s.promptTemplateService.GeneratePrompt(taskCtx, config.TemplateID)
+		if err != nil {
+			log.Printf("Failed to generate recommendation prompt: %v\n", err)
+			logEntry := &models.ScheduleLog{
+				TenantID:         config.TenantID,
+				ScheduleConfigID: config.ID,
+				TabTag:           config.TabTag,
+				TriggerType:      triggerType,
+				Status:           "failed",
+				Error:            fmt.Sprintf("generate prompt failed: %v", err),
+				ExecutedAt:       utils.NowString(),
+			}
+			if err := s.repo.CreateLog(taskCtx, logEntry); err != nil {
+				log.Printf("Failed to save schedule log: %v\n", err)
+			}
+			return
+		}
+
+		err = s.futuresRecommendationService.GenerateWithPrompt(taskCtx, config.ModelAPIID, config.ModelName, config.TabTag, prompt)
 		logEntry := &models.ScheduleLog{
 			TenantID:         config.TenantID,
 			ScheduleConfigID: config.ID,
-			TabTag:           models.TabTagFutures,
+			TabTag:           config.TabTag,
+			Prompt:           prompt,
 			TriggerType:      triggerType,
 			ExecutedAt:       utils.NowString(),
 		}
@@ -208,7 +228,13 @@ func (s *ScheduleService) executeTask(ctx context.Context, config models.Schedul
 		return
 	}
 
-	batchID, err := s.aiResponseService.GenerateBatchAIResponses(taskCtx, config.TemplateID, config.TabTag)
+	// 从模板 tags 中提取 sub_tag（用于期权等需要子分类的场景）
+	subTag := ""
+	if tpl, tErr := s.promptTemplateService.GetPromptTemplateByID(taskCtx, config.TemplateID); tErr == nil && tpl != nil {
+		subTag = models.ExtractSubTag(tpl.Tags)
+	}
+
+	batchID, err := s.aiResponseService.GenerateBatchAIResponsesWithSubTag(taskCtx, config.TemplateID, config.TabTag, subTag)
 	logEntry := &models.ScheduleLog{
 		TenantID:         config.TenantID,
 		ScheduleConfigID: config.ID,

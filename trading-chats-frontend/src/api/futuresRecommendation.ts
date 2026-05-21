@@ -14,13 +14,16 @@ export type RecommendationItem = {
 export type FuturesRecommendation = {
   id: string
   batch_id: string
+  tab_tag?: string
   items: RecommendationItem[]
   model_name: string
   model_api_name: string
   created_at: string
 }
 
-export async function getLatestFuturesRecommendation(): Promise<FuturesRecommendation | null> {
-  const res = await http.get<ApiResponse<FuturesRecommendation | null>>('/futures-recommendation/latest')
+export async function getLatestFuturesRecommendation(tabTag?: string): Promise<FuturesRecommendation | null> {
+  const res = await http.get<ApiResponse<FuturesRecommendation | null>>('/futures-recommendation/latest', {
+    params: tabTag ? { tab_tag: tabTag } : {},
+  })
   return unwrap(res.data)
 }

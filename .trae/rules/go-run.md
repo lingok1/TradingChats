@@ -15,7 +15,7 @@ netstat -ano | findstr :8080
 taskkill /PID 63364 /F
 
 后端项目路径为：trading-chats-backend\cmd\api\main.go
-运行后端项目的命令为：go run cmd/api/main.go
+git bash 启动方式,运行后端项目的命令为：go run cmd/api/main.go
 后端接口文档地址是：
 http://localhost:8080/swagger/index.html
 

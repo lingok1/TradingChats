@@ -10,11 +10,41 @@ import (
 )
 
 type ScheduleHandler struct {
-	service *service.ScheduleService
+	service               *service.ScheduleService
+	promptTemplateService *service.PromptTemplateService
 }
 
-func NewScheduleHandler(service *service.ScheduleService) *ScheduleHandler {
-	return &ScheduleHandler{service: service}
+func NewScheduleHandler(svc *service.ScheduleService, promptTemplateService *service.PromptTemplateService) *ScheduleHandler {
+	return &ScheduleHandler{service: svc, promptTemplateService: promptTemplateService}
+}
+
+// ScheduleConfigView 给前端的定时任务视图，包含从模板派生的 sub_tag
+type ScheduleConfigView struct {
+	models.ScheduleConfig
+	SubTag string `json:"sub_tag,omitempty"`
+}
+
+func (h *ScheduleHandler) enrichConfig(c *gin.Context, configs []models.ScheduleConfig) []ScheduleConfigView {
+	views := make([]ScheduleConfigView, 0, len(configs))
+	cache := map[string]string{}
+	for _, cfg := range configs {
+		view := ScheduleConfigView{ScheduleConfig: cfg}
+		if cfg.TemplateID != "" {
+			if sub, ok := cache[cfg.TemplateID]; ok {
+				view.SubTag = sub
+			} else if h.promptTemplateService != nil {
+				if tpl, err := h.promptTemplateService.GetPromptTemplateByID(c.Request.Context(), cfg.TemplateID); err == nil && tpl != nil {
+					sub := models.ExtractSubTag(tpl.Tags)
+					cache[cfg.TemplateID] = sub
+					view.SubTag = sub
+				} else {
+					cache[cfg.TemplateID] = ""
+				}
+			}
+		}
+		views = append(views, view)
+	}
+	return views
 }
 
 // CreateConfig 创建定时任务
@@ -65,7 +95,7 @@ func (h *ScheduleHandler) GetConfigs(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(configs))
+	c.JSON(http.StatusOK, models.SuccessResponse(h.enrichConfig(c, configs)))
 }
 
 // UpdateConfigStatus 更新定时任务状态

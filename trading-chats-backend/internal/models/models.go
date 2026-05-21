@@ -1,6 +1,8 @@
 package models
 
 import (
+	"strings"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -10,7 +12,21 @@ const (
 	TabTagStock    = "stock"
 	TabTagNews     = "news"
 	TabTagPosition = "position"
+	TabTagHome     = "home"
 )
+
+// SubTabTagPrefix 模板 tags 中声明子 tab 的前缀，例如 "subtab:郑州交易所"
+const SubTabTagPrefix = "subtab:"
+
+// ExtractSubTag 从 tags 中提取第一个 "subtab:xxx" 的值，没有返回空字符串
+func ExtractSubTag(tags []string) string {
+	for _, tag := range tags {
+		if strings.HasPrefix(tag, SubTabTagPrefix) {
+			return strings.TrimSpace(strings.TrimPrefix(tag, SubTabTagPrefix))
+		}
+	}
+	return ""
+}
 
 func NormalizeTabTag(tabTag string) string {
 	switch tabTag {
@@ -22,6 +38,8 @@ func NormalizeTabTag(tabTag string) string {
 		return TabTagNews
 	case TabTagPosition:
 		return TabTagPosition
+	case TabTagHome:
+		return TabTagHome
 	case TabTagFutures:
 		fallthrough
 	default:
@@ -76,6 +94,7 @@ type AIResponse struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	TenantID     string             `bson:"tenant_id" json:"tenant_id"`
 	BatchID      string             `bson:"batch_id" json:"batch_id"`
+	SubTag       string             `bson:"sub_tag,omitempty" json:"sub_tag,omitempty"`
 	Response     string             `bson:"response" json:"response"`
 	ModelAPIID   primitive.ObjectID `bson:"model_api_id,omitempty" json:"model_api_id"`
 	ModelAPIName string             `bson:"model_api_name" json:"model_api_name"`
@@ -121,6 +140,7 @@ type GenerateAIRequest struct {
 type AIResponseEvent struct {
 	Type         string `json:"type"`
 	TabTag       string `json:"tab_tag"`
+	SubTag       string `json:"sub_tag,omitempty"`
 	BatchID      string `json:"batch_id"`
 	Status       string `json:"status"`
 	ModelName    string `json:"model_name"`

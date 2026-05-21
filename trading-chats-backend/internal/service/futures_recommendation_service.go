@@ -36,6 +36,7 @@ type FuturesRecommendationService struct {
 	repo            *repository.FuturesRecommendationRepository
 	aiResponseRepo  *repository.AIResponseRepository
 	modelAPIService *ModelAPIService
+	eventService    *AIResponseEventService
 }
 
 func NewFuturesRecommendationService(
@@ -50,16 +51,29 @@ func NewFuturesRecommendationService(
 	}
 }
 
+// SetEventService 注入事件服务（用于推荐生成完成后通知前端）
+func (s *FuturesRecommendationService) SetEventService(eventService *AIResponseEventService) {
+	s.eventService = eventService
+}
+
 func (s *FuturesRecommendationService) GetLatest(ctx context.Context) (*models.FuturesRecommendation, error) {
 	return s.repo.GetLatest(ctx)
+}
+
+func (s *FuturesRecommendationService) GetLatestByTab(ctx context.Context, tabTag string) (*models.FuturesRecommendation, error) {
+	if tabTag == "" {
+		return s.repo.GetLatest(ctx)
+	}
+	return s.repo.GetLatestByTab(ctx, tabTag)
 }
 
 func (s *FuturesRecommendationService) GetList(ctx context.Context, limit int64) ([]models.FuturesRecommendation, error) {
 	return s.repo.GetList(ctx, limit)
 }
 
+// Generate 保留向后兼容
 func (s *FuturesRecommendationService) Generate(ctx context.Context, modelAPIID, modelName string) error {
-	// 1. 获取最新期货分析批次
+	// 从最新分析批次构建默认 prompt
 	batchID, err := s.aiResponseRepo.GetLatestCompletedBatchID(ctx, models.TabTagFutures)
 	if err != nil {
 		return fmt.Errorf("no completed futures analysis found: %w", err)
@@ -68,41 +82,71 @@ func (s *FuturesRecommendationService) Generate(ctx context.Context, modelAPIID,
 	if err != nil || len(responses) == 0 {
 		return fmt.Errorf("failed to load futures analysis: %w", err)
 	}
-
-	// 2. 拼接所有模型的分析结果
 	var sb strings.Builder
 	for i, r := range responses {
 		sb.WriteString(fmt.Sprintf("=== 模型%d（%s）分析结果 ===\n%s\n\n", i+1, r.ModelName, r.Response))
 	}
 	prompt := fmt.Sprintf(recommendationPromptTemplate, sb.String())
+	return s.GenerateWithPrompt(ctx, modelAPIID, modelName, models.TabTagFutures, prompt)
+}
 
-	// 3. 获取指定模型配置
+// GenerateWithPrompt 使用完整 prompt 生成推荐（prompt 中应已包含分析数据）
+func (s *FuturesRecommendationService) GenerateWithPrompt(ctx context.Context, modelAPIID, modelName, tabTag, prompt string) error {
+	if tabTag == "" {
+		tabTag = models.TabTagFutures
+	}
+
+	// 关联的 batch_id（用于追溯当前推荐来自哪批分析）
+	batchID, _ := s.aiResponseRepo.GetLatestCompletedBatchID(ctx, tabTag)
+
+	// 获取指定模型配置
 	modelConfig, err := s.modelAPIService.GetModelAPIConfigByID(ctx, modelAPIID)
 	if err != nil {
 		return fmt.Errorf("model config not found: %w", err)
 	}
 
-	// 4. 调用 AI
+	// 调用 AI
 	rawResponse, err := s.callModel(ctx, *modelConfig, modelName, prompt)
 	if err != nil {
 		return fmt.Errorf("AI call failed: %w", err)
 	}
 
-	// 5. 解析 JSON
+	// 解析 JSON
 	items, err := parseRecommendationJSON(rawResponse)
 	if err != nil {
 		return fmt.Errorf("failed to parse recommendation: %w", err)
 	}
 
-	// 6. 存库
+	// 存库
 	rec := &models.FuturesRecommendation{
 		BatchID:      batchID,
+		TabTag:       tabTag,
 		Items:        items,
 		RawResponse:  rawResponse,
 		ModelName:    modelName,
 		ModelAPIName: modelConfig.Name,
 	}
-	return s.repo.Save(ctx, rec)
+	if err := s.repo.Save(ctx, rec); err != nil {
+		return err
+	}
+
+	// 发布事件，通知前端刷新（复用 AIResponseEventService，事件类型为 recommendation_updated）
+	if s.eventService != nil {
+		event := models.AIResponseEvent{
+			Type:         "recommendation_updated",
+			TabTag:       tabTag,
+			BatchID:      batchID,
+			Status:       "completed",
+			ModelName:    modelName,
+			ModelAPIName: modelConfig.Name,
+			ResponseID:   rec.ID,
+		}
+		// 同时发布到对应 tab 频道和 home 频道（事件内容不变，仍含原 tab_tag）
+		s.eventService.Publish(event)
+		s.eventService.PublishToChannel("home", event)
+	}
+
+	return nil
 }
 
 func (s *FuturesRecommendationService) callModel(ctx context.Context, config models.ModelAPIConfig, modelName, prompt string) (string, error) {
@@ -112,7 +156,7 @@ func (s *FuturesRecommendationService) callModel(ctx context.Context, config mod
 			"role":    "user",
 			"content": prompt,
 		}},
-		"max_tokens": 1024,
+		"max_tokens": 8192,
 	}
 	data, _ := json.Marshal(reqData)
 

@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
 	"trading-chats-backend/internal/models"
 	"trading-chats-backend/internal/service"
@@ -193,6 +194,35 @@ func (h *PromptTemplateHandler) GetFuturesMarketSentiment(c *gin.Context) {
 	}
 	c.String(http.StatusOK, result)
 }
+
+// GetFuturesTopMovers 获取期货涨跌幅榜
+// @Summary 获取期货涨跌幅榜（涨幅前N + 跌幅前N）
+// @Tags 提示词模板
+// @Produce json
+// @Param url query string true "期货数据URL"
+// @Param limit query int false "每边的数量，默认9"
+// @Success 200 {object} models.Response
+// @Router /api/prompt-templates/futures-top-movers [get]
+func (h *PromptTemplateHandler) GetFuturesTopMovers(c *gin.Context) {
+	urlStr := c.Query("url")
+	if urlStr == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(400, "url is required"))
+		return
+	}
+	limit := 9
+	if l := c.Query("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	result, err := h.service.FetchFuturesTopMovers(c.Request.Context(), urlStr, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(500, err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, models.SuccessResponse(result))
+}
+
 // @Summary 生成 Prompt
 // @Description 基于模板生成 Prompt 内容
 // @Tags 提示词模板

@@ -17,10 +17,10 @@ const keyword = ref('')
 const currentPage = ref(1)
 const pageSize = 8
 
-const ALL_TABS = ['futures', 'options', 'stock', 'plan', 'about']
+const ALL_TABS = ['home', 'futures', 'options', 'stock', 'plan', 'about']
 const ALL_SETTINGS = ['schedules', 'models', 'templates', 'parameters', 'system']
 const TAB_LABELS: Record<string, string> = {
-  futures: '期货', options: '期权', stock: '股票', plan: '计划', about: '关于',
+  home: '首页', futures: '期货', options: '期权', stock: '股票', plan: '计划', about: '关于',
 }
 const SETTING_LABELS: Record<string, string> = {
   schedules: '任务', models: '模型', templates: '模板', parameters: '参数', system: '系统',
