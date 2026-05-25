@@ -54,8 +54,8 @@ const TAB_META: Record<AppTab, { title: string; description: string }> = {
     description: '展示期权页最近一批 AI 分析结果。',
   },
   stock: {
-    title: '股票',
-    description: '展示股票页最近一批 AI 分析结果。',
+    title: '股指',
+    description: '展示股指页最近一批 AI 分析结果。',
   },
   news: {
     title: '新闻',
@@ -75,8 +75,8 @@ const TAB_META: Record<AppTab, { title: string; description: string }> = {
   },
 }
 
-const ALL_NAV_TABS: AppTab[] = ['home', 'futures', 'options', 'stock', /* 'news', */ 'plan', /* 'position', */ 'about']
-const ALL_ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'stock', /* 'news', 'position' */]
+const ALL_NAV_TABS: AppTab[] = ['home', 'futures', 'options', 'stock', /* 'news', */ /* 'position', */ 'plan', 'about']
+const ALL_ANALYSIS_TABS: TabTag[] = ['futures', 'options', 'stock', /* 'news', */ /* 'position' */]
 
 const visibleTabs = ref<AppTab[]>(ALL_NAV_TABS)
 const visibleSettings = ref<string[]>(['schedules', 'models', 'templates', 'parameters', 'system'])
@@ -553,12 +553,12 @@ onUnmounted(() => {
 <template>
   <el-container class="tc-root">
     <el-header class="tc-header" :class="{ floating: headerFloating }">
-      <button class="tc-header-left tc-brand-button" type="button" title="返回期货" @click="handleBrandClick">
-        <img v-if="systemLogo" :src="systemLogo" alt="Logo" class="tc-logo" />
-        <div class="tc-title">{{ systemTitle }}</div>
-      </button>
-
       <div v-if="!isMobile" class="tc-header-tabs">
+        <button class="tc-brand-button" type="button" title="返回期货" @click="handleBrandClick">
+          <img v-if="systemLogo" :src="systemLogo" alt="Logo" class="tc-logo" />
+          <div class="tc-title">{{ systemTitle }}</div>
+        </button>
+
         <el-tabs v-model="activeTab" class="ogo-tabs" @tab-click="(tab: any) => handleTabChange(tab)">
           <el-tab-pane name="home">
             <template #label>
@@ -588,7 +588,7 @@ onUnmounted(() => {
             <template #label>
               <div class="ogo-tabs-tab-btn">
                 <div class="ogo-tabs-icon"><Icon :icon="stockIcon" class="nav-icon" /></div>
-                <span class="ogo-tabs-text">股票</span>
+                <span class="ogo-tabs-text">股指</span>
               </div>
             </template>
           </el-tab-pane>
@@ -627,6 +627,11 @@ onUnmounted(() => {
         </el-tabs>
       </div>
 
+      <button v-if="isMobile" class="tc-brand-button tc-mobile-brand-button" type="button" title="返回期货" @click="handleBrandClick">
+        <img v-if="systemLogo" :src="systemLogo" alt="Logo" class="tc-logo" />
+        <div class="tc-title">{{ systemTitle }}</div>
+      </button>
+
       <div v-if="isMobile" class="tc-header-current-page">
         <Icon :icon="currentHeaderIcon" class="header-page-icon" />
         <span class="tc-header-current-page-text">{{ currentTabMeta.title }}</span>
@@ -657,7 +662,7 @@ onUnmounted(() => {
             <Icon v-else-if="tab === 'futures'" :icon="futuresIcon" class="nav-icon" />
             <Icon v-else-if="tab === 'options'" :icon="optionsIcon" class="nav-icon" />
             <Icon v-else-if="tab === 'stock'" :icon="stockIcon" class="nav-icon" />
-            <Icon v-else-if="tab === 'news'" :icon="newsIcon" class="nav-icon" />
+            <!-- <Icon v-else-if="tab === 'news'" :icon="newsIcon" class="nav-icon" /> -->
             <Calendar v-else-if="tab === 'plan'" />
             <Icon v-else-if="tab === 'position'" :icon="positionIcon" class="nav-icon" />
             <Icon v-else :icon="aboutIcon" class="nav-icon" />
@@ -677,6 +682,7 @@ onUnmounted(() => {
           :mobile="isMobile"
           :logged-in="isLoggedIn"
           @open-detail="onOpenDetail"
+          @request-login="loginOpen = true"
         />
       </template>
 
@@ -686,7 +692,7 @@ onUnmounted(() => {
             <span class="tc-time">{{ isMobile ? '更新：' : '最近数据时间：' }}{{ batchCreatedAt || '-' }}</span>
             <span class="tc-divider">·</span>
             <el-tag size="small" :type="sseConnected ? 'success' : 'info'" effect="plain">
-              {{ sseConnected ? '实时已连接' : '重连中' }}
+              {{ sseConnected ? '实时推送' : '推送断开' }}
             </el-tag>
             <el-tag size="small" type="success" effect="plain">{{ successCount }}/{{ totalCount }}</el-tag>
           </div>
@@ -826,21 +832,26 @@ onUnmounted(() => {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
 }
 
-.tc-header-left,
 .tc-header-right {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   flex-shrink: 0;
+  min-width: 120px;
 }
 
 .tc-brand-button {
-  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 120px;
   padding: 0;
   border: 0;
   color: inherit;
   font: inherit;
-  text-align: left;
   background: transparent;
   cursor: pointer;
 }
@@ -854,6 +865,10 @@ onUnmounted(() => {
 .tc-header-tabs {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
 }
 
 .tc-logo {
@@ -897,6 +912,12 @@ onUnmounted(() => {
 .tc-title {
   font-size: 18px;
   font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tc-mobile-brand-button {
+  min-width: 0;
 }
 
 .tc-main {

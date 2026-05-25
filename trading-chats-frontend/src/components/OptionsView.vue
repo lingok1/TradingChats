@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import type { AIResponse, AIResponseEvent, ScheduleConfig } from '../api/types'
 import { getAIResponseEventsUrl, getLatestAIResponses } from '../api/aiResponses'
 import { getSchedules } from '../api/schedules'
@@ -13,6 +14,7 @@ const props = defineProps<{ mobile?: boolean; loggedIn: boolean }>()
 
 const emit = defineEmits<{
   (e: 'open-detail', row: SignalRow, markdown: string, modelName: string): void
+  (e: 'request-login'): void
 }>()
 
 const loading = ref(false)
@@ -51,10 +53,6 @@ const modelGroups = computed(() =>
  * - has_active = 该组中任一任务 status=active
  */
 async function loadSubTabs() {
-  if (!props.loggedIn) {
-    subTabs.value = []
-    return
-  }
   try {
     const all: ScheduleConfig[] = await getSchedules()
     const grouped = new Map<string, { has_active: boolean }>()
@@ -82,7 +80,7 @@ async function loadSubTabs() {
 }
 
 async function loadLatest(subTag: string) {
-  if (!props.loggedIn || !subTag) {
+  if (!subTag) {
     responses.value = []
     return
   }
@@ -171,16 +169,9 @@ watch(currentSubTag, (tag) => {
 // 登录状态变化时重新加载
 watch(
   () => props.loggedIn,
-  async (loggedIn) => {
-    if (loggedIn) {
-      await loadSubTabs()
-      startSSE()
-    } else {
-      subTabs.value = []
-      currentSubTag.value = ''
-      responses.value = []
-      closeSSE()
-    }
+  async () => {
+    await loadSubTabs()
+    startSSE()
   },
   { immediate: false },
 )
@@ -188,14 +179,12 @@ watch(
 let visibilityHandler: (() => void) | null = null
 
 onMounted(async () => {
-  if (props.loggedIn) {
-    await loadSubTabs()
-    startSSE()
-  }
+  await loadSubTabs()
+  startSSE()
   visibilityHandler = () => {
     if (document.visibilityState === 'hidden') {
       closeSSE()
-    } else if (!eventSource && props.loggedIn) {
+    } else if (!eventSource) {
       startSSE()
     }
   }
@@ -242,11 +231,13 @@ defineExpose({ refresh: manualRefresh })
           <span class="tc-time">{{ mobile ? '更新：' : '最近数据时间：' }}{{ batchCreatedAt || '-' }}</span>
           <span class="tc-divider">·</span>
           <el-tag size="small" :type="sseConnected ? 'success' : 'info'" effect="plain">
-            {{ sseConnected ? '实时已连接' : '重连中' }}
+            {{ sseConnected ? '实时推送' : '推送断开' }}
           </el-tag>
           <el-tag size="small" type="success" effect="plain">{{ successCount }}/{{ totalCount }}</el-tag>
         </div>
-        <el-button size="small" :loading="loading" @click="manualRefresh">刷新</el-button>
+        <el-button circle size="small" title="刷新数据" :loading="loading" @click="manualRefresh">
+          <el-icon><Refresh /></el-icon>
+        </el-button>
       </div>
 
       <el-alert

@@ -140,10 +140,14 @@ type FuturesMover struct {
 	Zdf  float64 `json:"zdf"`
 }
 
-// FuturesTopMovers 涨跌榜结果：gainers=涨幅前N，losers=跌幅前N
+// FuturesTopMovers 涨跌榜结果：gainers=涨幅前N，losers=跌幅前N，涨跌平计数
 type FuturesTopMovers struct {
-	Gainers []FuturesMover `json:"gainers"`
-	Losers  []FuturesMover `json:"losers"`
+	Gainers     []FuturesMover `json:"gainers"`
+	Losers      []FuturesMover `json:"losers"`
+	GainersCnt  int            `json:"gainers_cnt"`
+	LosersCnt   int            `json:"losers_cnt"`
+	FlatCnt     int            `json:"flat_cnt"`
+	Total       int            `json:"total"`
 }
 
 // FetchFuturesTopMovers 从 URL 获取期货数据，返回涨/跌幅各前 limit 个品种
@@ -193,6 +197,17 @@ func extractFuturesTopMovers(data interface{}, limit int) *FuturesTopMovers {
 			continue
 		}
 		items = append(items, FuturesMover{Name: name, DM: dm, P: p, Zdf: zdf})
+	}
+	result.Total = len(items)
+	for _, it := range items {
+		switch {
+		case it.Zdf > 0:
+			result.GainersCnt++
+		case it.Zdf < 0:
+			result.LosersCnt++
+		default:
+			result.FlatCnt++
+		}
 	}
 
 	// 按 zdf 降序复制一份取涨幅前 limit

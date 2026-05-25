@@ -21,8 +21,8 @@ function toBeijingTime(utc: string): string {
 
 const TAB_LIST = [
   { tag: 'futures', label: '期货优选', icon: '📈' },
-  { tag: 'options', label: '期权优选', icon: '🎯' },
-  { tag: 'stock', label: '股票优选', icon: '📊' },
+  { tag: 'options', label: '商品期权优选', icon: '🎯' },
+  { tag: 'stock', label: '股指期权优选', icon: '📊' },
 ] as const
 
 type TabKey = (typeof TAB_LIST)[number]['tag']
@@ -117,6 +117,8 @@ type Mover = { name: string; dm: string; p: number; zdf: number }
 const gainers = ref<Mover[]>([])
 const losers = ref<Mover[]>([])
 const moversLoading = ref(false)
+const moversCounts = ref<{ gainers_cnt: number; losers_cnt: number; flat_cnt: number; total: number }>({ gainers_cnt: 0, losers_cnt: 0, flat_cnt: 0, total: 0 })
+const moversTime = ref('')
 let moversTimer: number | null = null
 
 async function loadTopMovers() {
@@ -124,14 +126,22 @@ async function loadTopMovers() {
   if (!targetUrl) return
   moversLoading.value = true
   try {
-    const res = await http.get<{ code: number; data: { gainers: Mover[]; losers: Mover[] } }>('/prompt-templates/futures-top-movers', {
+    const res = await http.get<{ code: number; data: { gainers: Mover[]; losers: Mover[]; gainers_cnt: number; losers_cnt: number; flat_cnt: number; total: number } }>('/prompt-templates/futures-top-movers', {
       params: { url: targetUrl, limit: 9 },
     })
     gainers.value = res.data?.data?.gainers ?? []
     losers.value = res.data?.data?.losers ?? []
+    moversCounts.value = {
+      gainers_cnt: res.data?.data?.gainers_cnt ?? 0,
+      losers_cnt: res.data?.data?.losers_cnt ?? 0,
+      flat_cnt: res.data?.data?.flat_cnt ?? 0,
+      total: res.data?.data?.total ?? 0,
+    }
+    moversTime.value = toBeijingTime(new Date().toISOString())
   } catch {
     gainers.value = []
     losers.value = []
+    moversCounts.value = { gainers_cnt: 0, losers_cnt: 0, flat_cnt: 0, total: 0 }
   } finally {
     moversLoading.value = false
   }
@@ -262,19 +272,8 @@ function isLong(direction: string) {
     <div class="home-header">
       <!-- <div class="home-title">优选推荐</div> -->
       <div class="home-status">
-        <el-tooltip
-          v-if="sentimentDetail"
-          :content="sentimentDetail"
-          placement="bottom"
-          effect="light"
-        >
-          <span class="sentiment-pill" :class="sentimentTone" v-loading="sentimentLoading">
-            <span class="sentiment-session">{{ sessionLabel }}</span>
-            <span class="sentiment-text">{{ sentimentSummary }}</span>
-          </span>
-        </el-tooltip>
         <el-tag size="small" :type="sseConnected ? 'success' : 'info'" effect="plain">
-          {{ sseConnected ? '实时已连接' : '重连中' }}
+          {{ sseConnected ? '实时推送' : '推送断开' }}
         </el-tag>
         <el-button size="small" circle title="刷新" @click="loadAll()">
           <el-icon><svg viewBox="0 0 1024 1024" width="14" height="14"><path fill="currentColor" d="M512 0A512 512 0 1 0 1024 512h-72a440 440 0 1 1-130-313l-92 92h236V0l-92 92A512 512 0 0 0 512 0z"/></svg></el-icon>
@@ -285,8 +284,28 @@ function isLong(direction: string) {
     <!-- 涨跌幅榜：左 3×3 涨幅 + 右 3×3 跌幅 -->
     <div v-if="gainers.length || losers.length" class="movers-section" v-loading="moversLoading">
       <div class="movers-header">
-        <span class="movers-title">涨跌幅榜</span>
-        <span class="movers-meta">{{ sessionLabel }} · TOP 9</span>
+        <div class="movers-left">
+          <span class="movers-title">涨跌幅榜</span>
+          <span v-if="moversTime" class="movers-time">{{ mobile ? '更新：' : '最近数据时间：' }}{{ moversTime }}</span>
+        </div>
+        <div class="movers-right">
+          <span class="movers-counts">
+            <span class="count-item up">涨 {{ moversCounts.gainers_cnt }}</span>
+            <span class="count-item down">跌 {{ moversCounts.losers_cnt }}</span>
+            <span class="count-item flat">平 {{ moversCounts.flat_cnt }}</span>
+          </span>
+          <el-tooltip
+            v-if="sentimentDetail"
+            :content="sentimentDetail"
+            placement="bottom"
+            effect="light"
+          >
+            <span class="sentiment-pill" :class="sentimentTone" v-loading="sentimentLoading">
+              <span class="sentiment-session">{{ sessionLabel }}</span>
+              <span class="sentiment-text">{{ sentimentSummary }}</span>
+            </span>
+          </el-tooltip>
+        </div>
       </div>
       <div class="movers-row">
         <div class="movers-col">
@@ -317,12 +336,12 @@ function isLong(direction: string) {
             <span>{{ tab.label }}</span>
           </div>
           <span v-if="recommendations[tab.tag]" class="rec-card-meta">
+            <span class="rec-card-model">{{ recommendations[tab.tag]!.model_name }}</span>
             {{ toBeijingTime(recommendations[tab.tag]!.created_at) }}
           </span>
         </div>
 
         <div v-if="recommendations[tab.tag]?.items?.length" class="rec-card-body">
-          <div class="rec-card-model">{{ recommendations[tab.tag]!.model_name }}</div>
           <div class="rec-items">
             <div v-for="(item, i) in recommendations[tab.tag]!.items" :key="i" class="rec-item">
               <div class="rec-rank">{{ i + 1 }}</div>
@@ -357,12 +376,12 @@ function isLong(direction: string) {
             <span>{{ tab.label }}</span>
           </div>
           <span v-if="recommendations[tab.tag]" class="rec-card-meta">
+            <span class="rec-card-model">{{ recommendations[tab.tag]!.model_name }}</span>
             {{ toBeijingTime(recommendations[tab.tag]!.created_at) }}
           </span>
         </div>
 
         <div v-if="recommendations[tab.tag]?.items?.length" class="rec-card-body">
-          <div class="rec-card-model">{{ recommendations[tab.tag]!.model_name }}</div>
           <div class="rec-items">
             <div v-for="(item, i) in recommendations[tab.tag]!.items" :key="i" class="rec-item">
               <div class="rec-rank">{{ i + 1 }}</div>
@@ -470,13 +489,41 @@ function isLong(direction: string) {
   align-items: center;
   justify-content: space-between;
 }
+.movers-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.movers-time {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+.movers-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .movers-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
-.movers-meta {
+.movers-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
+}
+.count-item {
+  color: var(--el-text-color-secondary);
+}
+.count-item.up {
+  color: var(--el-color-danger);
+}
+.count-item.down {
+  color: var(--el-color-success);
+}
+.count-item.flat {
   color: var(--el-text-color-secondary);
 }
 .movers-row {
@@ -600,12 +647,16 @@ function isLong(direction: string) {
 .rec-card-meta {
   font-size: 11px;
   color: var(--el-text-color-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .rec-card-model {
   font-size: 11px;
   color: var(--el-text-color-placeholder);
-  margin-bottom: 4px;
+  padding-right: 6px;
+  border-right: 1px solid var(--el-border-color-lighter);
 }
 
 .rec-card-body {
